@@ -575,7 +575,7 @@ function setupUpdates() {
       if (manualCheck) toast('إنت على آخر إصدار');
       manualCheck = false;
     } else if (ev === 'error') {
-      if (manualCheck) toast('تعذر فحص التحديث: ' + d);
+      if (manualCheck) toast(String(d).slice(0, 120));
       manualCheck = false;
     }
   });

@@ -180,7 +180,7 @@ li.active .pn b { color: var(--brand-ink); }
 .cred div + div { border-top: 1px dashed var(--line-2); }
 .cred b { font-size: 24px; letter-spacing: 3px; direction: ltr; color: var(--txt); }
 .hint { color: var(--mut); font-size: 13px; line-height: 1.7; }
-.toast { position: fixed; bottom: 26px; left: 50%; translate: -50% 0; background: var(--txt); color: var(--bg); padding: 11px 20px; border-radius: 12px; z-index: 20; font-weight: 600; box-shadow: var(--shadow-l); animation: rise .2s ease both; }
+.toast { max-width: min(560px, 88vw); text-align: center; overflow-wrap: anywhere; position: fixed; bottom: 26px; left: 50%; translate: -50% 0; background: var(--txt); color: var(--bg); padding: 11px 20px; border-radius: 12px; z-index: 20; font-weight: 600; box-shadow: var(--shadow-l); animation: rise .2s ease both; }
 .updbar { position: fixed; top: 12px; left: 50%; translate: -50% 0; background: var(--surface); border: 1px solid var(--brand); border-radius: 14px; padding: 9px 16px; display: flex; gap: 12px; align-items: center; z-index: 15; box-shadow: var(--shadow-l); font-weight: 600; }
 
 /* ============ Settings ============ */

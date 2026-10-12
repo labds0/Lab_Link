@@ -52,7 +52,12 @@ function setupUpdater() {
   autoUpdater.on('update-not-available', () => send('update:none'));
   autoUpdater.on('download-progress', (p) => send('update:progress', { percent: Math.round(p.percent) }));
   autoUpdater.on('update-downloaded', () => send('update:ready'));
-  autoUpdater.on('error', (e) => send('update:error', String((e && e.message) || e)));
+  // 404 معناها مفيش إصدار منشور لسه على السيرفر = المعمل على آخر إصدار (مش عطل)
+  autoUpdater.on('error', (e) => {
+    const m = String((e && e.message) || e);
+    if (/404|ENOENT|Cannot find latest/i.test(m)) send('update:none');
+    else send('update:error', 'تعذر الاتصال بسيرفر التحديثات');
+  });
 }
 
 ipcMain.on('config', (e) => {
@@ -60,7 +65,7 @@ ipcMain.on('config', (e) => {
 });
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { dev: true };
-  try { await autoUpdater.checkForUpdates(); return {}; } catch (e) { return { error: String((e && e.message) || e) }; }
+  try { await autoUpdater.checkForUpdates(); return {}; } catch (e) { return /404|ENOENT/i.test(String((e && e.message) || e)) ? {} : { error: 'تعذر الاتصال بسيرفر التحديثات' }; }
 });
 ipcMain.handle('update:download', () => autoUpdater.downloadUpdate());
 // تثبيت صامت فوق النسخة الحالية: من غير حذف، وبيانات الدخول بتفضل زي ما هي
