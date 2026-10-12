@@ -1,4 +1,5 @@
 {
-  "API_URL": "https://lab-results-api.m-afifi35.workers.dev",
-  "APP_NAME": "Lab Link"
+  "API_URL": "https://lab-results-api.labds.workers.dev",
+  "APP_NAME": "Lab Link",
+  "MOBILE_URL": "https://labds0.github.io/Lab_Link/"
 }

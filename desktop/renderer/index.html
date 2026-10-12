@@ -4,15 +4,19 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https: http://localhost:*; img-src 'self' data: blob:; frame-src blob:; style-src 'self' 'unsafe-inline'; script-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f3f6f9">
 <title>Lab Link</title>
 <link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
 </head>
 <body>
 
 <section id="auth" class="auth hidden">
+  <button class="icon-btn theme-fab theme-toggle" type="button" title="الوضع الليلي / النهاري"></button>
   <div class="auth-card">
-    <img src="logo.svg" class="logo-lg" alt="">
+    <div class="brand-mark"><img id="authLogo" src="logo.svg" alt=""></div>
     <h1 id="authTitle"></h1>
+    <p id="authSub" class="auth-sub"></p>
 
     <!-- تفعيل الجهاز (أول مرة بس) -->
     <div id="activateBox" class="hidden">
@@ -20,11 +24,11 @@
       <div class="serial-box">
         <span>رقم الجهاز</span>
         <b id="serialText"></b>
-        <button type="button" class="btn sm" id="copySerial">نسخ</button>
+        <button type="button" class="btn sm" id="copySerial"><i data-i="copy"></i>نسخ</button>
       </div>
       <form id="activateForm">
         <label>كود التفعيل<input name="code" dir="ltr" placeholder="XXXX-XXXX-XXXX" autocomplete="off" required></label>
-        <button class="btn primary" type="submit">تفعيل</button>
+        <button class="btn primary block lg" type="submit">تفعيل</button>
       </form>
     </div>
 
@@ -32,25 +36,26 @@
     <form id="loginForm" class="hidden">
       <label>اسم المستخدم<input name="username" dir="ltr" autocomplete="username" required></label>
       <label>كلمة السر<input name="password" type="password" autocomplete="current-password" required></label>
-      <button class="btn primary" type="submit">دخول</button>
+      <button class="btn primary block lg" type="submit">دخول</button>
     </form>
 
     <p id="authMsg" class="msg"></p>
-    <button id="retryBtn" class="btn hidden" type="button">إعادة المحاولة</button>
+    <button id="retryBtn" class="btn hidden" type="button"><i data-i="refresh"></i>إعادة المحاولة</button>
   </div>
 </section>
 
 <section id="main" class="main hidden">
   <header class="topbar">
-    <img src="logo.svg" class="logo-sm" alt="">
+    <div class="logo-tile"><img id="topLogo" src="logo.svg" alt=""></div>
     <div class="brand">
       <strong id="appName"></strong>
       <span id="labInfo"></span>
     </div>
     <span id="ver" class="ver"></span>
-    <button id="updBtn" class="btn ghost sm">التحقق من تحديث</button>
-    <button id="settingsBtn" class="btn">الإعدادات</button>
-    <button id="logoutBtn" class="btn ghost">تسجيل الخروج</button>
+    <button id="updBtn" class="icon-btn" title="التحقق من تحديث"><i data-i="refresh"></i></button>
+    <button class="icon-btn theme-toggle" type="button" title="الوضع الليلي / النهاري"></button>
+    <button id="settingsBtn" class="btn"><i data-i="settings"></i>الإعدادات</button>
+    <button id="logoutBtn" class="btn ghost"><i data-i="logout"></i>خروج</button>
   </header>
   <div id="pwWarn" class="warnbar hidden">
     <span>كلمة السر الحالية هي الافتراضية (1234). غيّرها من الإعدادات عشان الأمان.</span>
@@ -59,13 +64,14 @@
 
   <div class="layout">
     <aside class="patients">
-      <button id="newPatientBtn" class="btn primary block">+ مريض جديد</button>
-      <input id="search" class="search" placeholder="بحث بالاسم أو الكود">
+      <button id="newPatientBtn" class="btn primary block lg"><i data-i="plus"></i>مريض جديد</button>
+      <div class="search-wrap">
+        <i data-i="search"></i>
+        <input id="search" class="search" placeholder="بحث بالاسم أو الكود">
+      </div>
       <ul id="patientList"></ul>
     </aside>
-    <main id="results" class="results">
-      <div class="empty">اختار مريض من القائمة</div>
-    </main>
+    <main id="results" class="results"></main>
   </div>
 </section>
 

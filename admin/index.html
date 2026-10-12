@@ -4,38 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lab Link - لوحة التفعيل (للأدمن)</title>
+<script>(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}var d=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})()</script>
 <style>
-:root{--teal:#0f766e;--bg:#f3f6f6;--line:#dbe3e3;--txt:#17282a;--mut:#647779;--red:#b91c1c}
+:root{color-scheme:light;--teal:#0d9488;--bg:#f3f6f9;--surface:#fff;--surface-2:#f7f9fb;--line:#e2e8ee;--txt:#0f1c24;--mut:#64768a;--red:#dc2626;--soft:#e1f6f3;--ink:#0a5f57;--g1:#14b8a6;--g2:#0e7490;--on:#fff;--hover:#eef3f7;--sh:0 1px 2px rgba(15,28,36,.06),0 8px 28px rgba(15,28,36,.07)}
+:root[data-theme=dark]{color-scheme:dark;--teal:#2dd4bf;--bg:#0a1216;--surface:#111b21;--surface-2:#15232a;--line:#1f3038;--txt:#e7f0f3;--mut:#8da2ad;--red:#f87171;--soft:rgba(45,212,191,.13);--ink:#7ff0dd;--g1:#2dd4bf;--g2:#38bdf8;--on:#021b1f;--hover:#172830;--sh:0 8px 28px rgba(0,0,0,.35)}
 *{box-sizing:border-box}
-body{margin:0;font-family:"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--txt);padding:24px}
-.wrap{max-width:980px;margin:0 auto}
-.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 4px 18px rgba(0,0,0,.06)}
-h1{margin:0 0 6px;font-size:22px}h2{margin:0 0 14px;font-size:17px}
+body{margin:0;font-family:"Segoe UI",system-ui,Tahoma,sans-serif;background:var(--bg);color:var(--txt);padding:24px;transition:background .25s}
+.wrap{max-width:1040px;margin:0 auto}
+.top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.top img{width:52px;height:52px;border-radius:15px}.top .t{flex:1}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:var(--sh)}
+h1{margin:0 0 2px;font-size:22px;font-weight:800}h2{margin:0 0 14px;font-size:17px}
 .sub{color:var(--mut);margin:0 0 14px;font-size:14px}
-label{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
-input{width:100%;margin-top:4px;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit}
+label{display:block;font-size:13px;font-weight:600;color:var(--mut);margin-bottom:12px}
+input{width:100%;margin-top:5px;padding:11px 12px;border:1px solid var(--line);background:var(--surface-2);color:var(--txt);border-radius:10px;font-size:15px;font-family:inherit}
+input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 4px var(--soft)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-button{font-family:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
-button.p{background:var(--teal);border-color:var(--teal);color:#fff}
-button.d{color:var(--red);border-color:#f0c8c8}
-button.s{padding:4px 10px;font-size:13px}
+button{font-family:inherit;border:1px solid var(--line);background:var(--surface);color:var(--txt);border-radius:10px;padding:9px 16px;cursor:pointer;font-size:14px;font-weight:600}
+button:hover{background:var(--hover)}
+button.p{background:linear-gradient(135deg,var(--g1),var(--g2));border:0;color:var(--on)}
+button.p:hover{filter:brightness(1.06)}
+button.d{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent);background:transparent}
+button.s{padding:5px 11px;font-size:13px;border-radius:8px}
 .msg{min-height:20px;margin-top:10px;font-size:14px;color:var(--red)}.msg.ok{color:var(--teal)}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{text-align:right;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{color:var(--mut);font-weight:600;font-size:13px}
+th,td{text-align:right;padding:11px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mut);font-weight:700;font-size:13px}
 .mono{direction:ltr;font-family:Consolas,monospace;letter-spacing:1px;white-space:nowrap}
-.tag{border-radius:20px;padding:2px 10px;font-size:12px}
-.on{background:#ccfbf1;color:#115e59}.off{background:#e8eef0;color:var(--mut)}.blk{background:#fee2e2;color:var(--red)}
+.tag{border-radius:20px;padding:2px 11px;font-size:12px;font-weight:700}
+.on{background:var(--soft);color:var(--ink)}.off{background:var(--hover);color:var(--mut)}.blk{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
 .acts{display:flex;gap:6px;flex-wrap:wrap}
-.big{font-size:22px;font-weight:700;direction:ltr;letter-spacing:3px;color:var(--teal)}
-.res{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px;margin-top:14px}
+.big{font-size:24px;font-weight:800;direction:ltr;letter-spacing:3px;color:var(--teal)}
+.res{background:var(--soft);border:1px solid color-mix(in srgb,var(--teal) 35%,transparent);border-radius:14px;padding:16px;margin-top:14px}
+.lab{display:flex;align-items:center;gap:10px}
+.lab .lg{width:36px;height:36px;border-radius:10px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;flex:none;font-size:12px;color:var(--mut)}
+.lab .lg img{width:100%;height:100%;object-fit:contain}
 @media(max-width:700px){.g2,.g3{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Lab Link - لوحة تفعيل المعامل</h1>
-  <p class="sub">للأدمن بس. افتح الملف ده من جهازك، ماترفعوش على أي موقع.</p>
+  <div class="top"><img src="../mobile/logo.svg" alt=""><div class="t"><h1>Lab Link - لوحة تفعيل المعامل</h1>
+  <p class="sub" style="margin:0">للأدمن بس. افتح الملف ده من جهازك، ماترفعوش على أي موقع.</p></div>
+  <button id="theme" type="button">🌙</button></div>
 
   <div class="card">
     <div class="g2">
@@ -99,18 +110,33 @@ async function load() {
 function status(d) { return d.blocked ? '<span class="tag blk">موقوف</span>' : d.activatedAt ? '<span class="tag on">مفعّل</span>' : '<span class="tag off">لسه ما اتفعّلش</span>'; }
 function render() {
   $('#rows').innerHTML = devices.length ? devices.map((d) => `<tr data-s="${esc(d.serial)}">
-    <td>${esc(d.labName)}</td><td>${esc(d.branch)}</td>
+    <td><div class="lab"><span class="lg">${d.logo ? `<img src="${esc(d.logo)}" alt="">` : '—'}</span>${esc(d.labName)}</div></td><td>${esc(d.branch)}</td>
     <td class="mono">${esc(d.serial)}</td>
     <td class="mono"><b>${esc(d.code)}</b> <button class="s" data-a="copy">نسخ</button></td>
     <td>${status(d)}</td>
     <td><div class="acts">
       <button class="s" data-a="edit">تعديل</button>
+      <button class="s" data-a="logo">لوجو</button>
       <button class="s" data-a="${d.blocked ? 'unblock' : 'block'}">${d.blocked ? 'تشغيل' : 'إيقاف'}</button>
       <button class="s" data-a="move">نقل لسيريال جديد</button>
       <button class="s d" data-a="reset">إرجاع admin/1234</button>
     </div></td></tr>`).join('') : '<tr><td colspan="6" style="color:var(--mut)">لا توجد أجهزة</td></tr>';
 }
 $('#connect').onclick = load;
+function toLogo(file) {
+  return new Promise((ok, no) => {
+    const u = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(u); let m = 256;
+      for (let i = 0; i < 5; i++) { const k = Math.min(1, m / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); const o = c.toDataURL('image/png'); if (o.length <= 250000) return ok(o); m = Math.round(m * .7); }
+      no(new Error('الصورة كبيرة')); };
+    img.onerror = () => no(new Error('الملف مش صورة')); img.src = u;
+  });
+}
+const th = () => { $('#theme').textContent = document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙'; };
+$('#theme').onclick = () => { const n = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = n; try { localStorage.setItem('theme', n); } catch {} th(); };
+th();
 $('#addForm').onsubmit = async (e) => {
   e.preventDefault();
   try {
@@ -131,6 +157,13 @@ $('#rows').onclick = async (e) => {
       const branch = prompt('رقم الفرع', d.branch); if (branch === null) return;
       const address = prompt('العنوان', d.address || ''); if (address === null) return;
       await call('POST', '/api/admin/devices/' + s, { labName, branch, address });
+    } else if (a === 'logo') {
+      const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/png,image/jpeg,image/webp';
+      f.onchange = async () => {
+        try { await call('POST', '/api/admin/devices/' + s, { logo: f.files[0] ? await toLogo(f.files[0]) : undefined }); msg('تم تحديث اللوجو', true); load(); }
+        catch (err) { msg(err.message); }
+      };
+      f.click(); return;
     } else if (a === 'move') {
       const newSerial = prompt('اكتب السيريال الجديد للجهاز (بعد تغيير الهارد أو اللوحة الأم). البيانات والمستخدمين هتفضل، والمعمل هيحتاج كود التفعيل الجديد:'); if (!newSerial) return;
       const d2 = await call('POST', `/api/admin/devices/${s}/move`, { newSerial });

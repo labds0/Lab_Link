@@ -39,7 +39,10 @@ npx wrangler deploy
 - `desktop/app-config.json` (API_URL، وتقدر تغير APP_NAME)
 - `mobile/index.html` (ثابت API_URL في أول السكريبت)
 
-وبدّل اللوجو: `desktop/renderer/logo.svg` و `icon.png` (256×256) و `mobile/logo.svg` و `icon-512.png`.
+**هوية كل معمل (اسم + لوجو):** المدير في المعمل يفتح **الإعدادات ← بيانات المعمل** ويكتب اسم المعمل ويرفع اللوجو (PNG/JPG/WEBP، بيتصغّر تلقائيًا). المريض اللي مسجّل عند المعمل ده بس يشوف اسم المعمل ولوجوه في الموبايل بدل "Lab Link"، وكمان في الطباعة ورسالة الواتساب. لو المعمل ماحطش لوجو بيظهر لوجو البرنامج الافتراضي. تقدر كمان تعدّل اللوجو من لوحة `admin/index.html` (زر "لوجو").
+- أيقونة البرنامج الافتراضية (لما مفيش لوجو): `desktop/renderer/logo.svg` و `icon.png` و `mobile/logo.svg` و `icon-192.png` و `icon-512.png` و `icon-maskable-512.png` و `apple-touch-icon.png`.
+- أيقونة تثبيت التطبيق على الموبايل (Add to Home screen) ثابتة لكل نسخة موقع، فمش بتتغير حسب المعمل.
+- **الوضع الليلي:** تلقائي حسب إعدادات الجهاز، وزر القمر/الشمس في أعلى الشاشة يبدّل يدويًا ويفتكر اختيارك.
 
 ## 3) بناء برنامج Windows وتحديثه بدون حذف
 ارفع المجلد على GitHub وضيف في Settings ← Secrets: `CLOUDFLARE_API_TOKEN` (صلاحية Workers R2 Storage Edit) و `CLOUDFLARE_ACCOUNT_ID`.

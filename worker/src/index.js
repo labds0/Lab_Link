@@ -112,8 +112,38 @@ async function activationCode(env, serial) {
 }
 const getDevice = (env, serial) => env.DATA.get('dev:' + serial, 'json');
 const clientIp = (req) => req.headers.get('CF-Connecting-IP') || '';
-const labInfo = (dev, user) => ({
+
+/* ---------- هوية المعمل: الاسم + اللوجو (بتظهر للمريض بتاع المعمل ده بس) ---------- */
+const MAX_LOGO = 300000; // حجم الـ data URL بالحروف (حوالي 220KB صورة)
+const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+// يرجّع { value } لو صالح (النص الفاضي = إزالة اللوجو) أو { error }
+function parseLogo(v) {
+  if (v === '' || v === null) return { value: '' };
+  if (typeof v !== 'string' || v.length > MAX_LOGO || !LOGO_RE.test(v)) return { error: 'اللوجو لازم يكون صورة PNG أو JPG أو WEBP وحجمها صغير' };
+  return { value: v };
+}
+// logo === undefined معناها سيب اللوجو الحالي زي ما هو
+async function saveBrand(env, dev, logo) {
+  const old = (await env.DATA.get('brand:' + dev.labId, 'json')) || {};
+  const brand = { labName: dev.labName, logo: logo === undefined ? old.logo || '' : logo };
+  await env.DATA.put('brand:' + dev.labId, JSON.stringify(brand));
+  return brand;
+}
+async function getBrand(env, labId, dev) {
+  const b = await env.DATA.get('brand:' + labId, 'json');
+  if (b) return b;
+  // معمل قديم قبل التحديث: نلاقي بياناته من سجل الجهاز ونخزنها مرة واحدة
+  if (!dev) {
+    for (const k of await listAll(env, 'dev:')) {
+      const d = await env.DATA.get(k.name, 'json');
+      if (d && d.labId === labId) { dev = d; break; }
+    }
+  }
+  return dev ? await saveBrand(env, dev) : { labName: '', logo: '' };
+}
+const labInfo = async (env, dev, user) => ({
   labName: dev.labName,
+  logo: (await getBrand(env, dev.labId, dev)).logo || '',
   address: dev.address,
   branch: dev.branch,
   username: user.username,
@@ -181,7 +211,8 @@ const signLabToken = (env, dev, username) =>
 async function deviceStatus(req, env) {
   const serial = normSerial(new URL(req.url).searchParams.get('serial'));
   const dev = serial ? await getDevice(env, serial) : null;
-  return json({ activated: !!(dev && dev.activatedAt && !dev.blocked), labName: dev && dev.activatedAt ? dev.labName : '' });
+  const on = !!(dev && dev.activatedAt && !dev.blocked);
+  return json({ activated: on, labName: on ? dev.labName : '', logo: on ? (await getBrand(env, dev.labId, dev)).logo || '' : '' });
 }
 
 async function deviceActivate(req, env) {
@@ -225,13 +256,13 @@ async function labLogin(req, env) {
     return fail('اسم المستخدم أو كلمة السر غلط', 401);
   }
   await clearFail(env, lockKey);
-  return json({ token: await signLabToken(env, dev, user.username), lab: labInfo(dev, user) });
+  return json({ token: await signLabToken(env, dev, user.username), lab: await labInfo(env, dev, user) });
 }
 
 /* ---------- lab: حسابي / المستخدمين / بيانات المعمل ---------- */
 async function labMe(env, me) {
   const user = await env.DATA.get(`lu:${me.id}:${me.u}`, 'json');
-  return json({ lab: labInfo(me.dev, user) });
+  return json({ lab: await labInfo(env, me.dev, user) });
 }
 
 async function updateMe(req, env, me) {
@@ -258,7 +289,7 @@ async function updateMe(req, env, me) {
   await putUser(env, me.id, updated);
   if (newName !== user.username) await env.DATA.delete(`lu:${me.id}:${user.username}`);
   await clearFail(env, lockKey);
-  return json({ token: await signLabToken(env, me.dev, newName), lab: labInfo(me.dev, updated) });
+  return json({ token: await signLabToken(env, me.dev, newName), lab: await labInfo(env, me.dev, updated) });
 }
 
 async function updateLabInfo(req, env, me) {
@@ -266,10 +297,17 @@ async function updateLabInfo(req, env, me) {
   const labName = clean(b.labName);
   const branch = clean(b.branch, 60);
   if (!labName || !branch) return fail('اكتب اسم المعمل ورقم الفرع');
+  let logo;
+  if (b.logo !== undefined) {
+    const l = parseLogo(b.logo);
+    if (l.error) return fail(l.error);
+    logo = l.value;
+  }
   const dev = { ...me.dev, labName, branch, address: clean(b.address, 250) };
   await env.DATA.put('dev:' + dev.serial, JSON.stringify(dev));
+  await saveBrand(env, dev, logo);
   const user = await env.DATA.get(`lu:${me.id}:${me.u}`, 'json');
-  return json({ lab: labInfo(dev, user) });
+  return json({ lab: await labInfo(env, dev, user) });
 }
 
 async function listUsers(env, me) {
@@ -322,7 +360,8 @@ async function userAction(req, env, me, username, action) {
 
 /* ---------- admin: الأجهزة وأكواد التفعيل (إنت بس) ---------- */
 async function deviceOut(env, d) {
-  return { ...d, code: await activationCode(env, d.serial) };
+  const brand = await getBrand(env, d.labId, d);
+  return { ...d, code: await activationCode(env, d.serial), logo: brand.logo || '' };
 }
 
 async function adminApi(req, env, pathname) {
@@ -354,6 +393,7 @@ async function adminApi(req, env, pathname) {
     if (await getDevice(env, serial)) return fail('الجهاز ده مسجّل قبل كده', 409);
     const dev = { serial, labId: crypto.randomUUID(), labName, branch, address: clean(b.address, 250), blocked: false, activatedAt: null, created: Date.now() };
     await env.DATA.put('dev:' + serial, JSON.stringify(dev));
+    await saveBrand(env, dev, '');
     await putUser(env, dev.labId, await makeUser(DEFAULT_ADMIN.username, DEFAULT_ADMIN.password, 'admin', true));
     return json(await deviceOut(env, dev));
   }
@@ -366,6 +406,13 @@ async function adminApi(req, env, pathname) {
       if (b.labName !== undefined) dev.labName = clean(b.labName) || dev.labName;
       if (b.branch !== undefined) dev.branch = clean(b.branch, 60) || dev.branch;
       if (b.address !== undefined) dev.address = clean(b.address, 250);
+      let logo;
+      if (b.logo !== undefined) {
+        const l = parseLogo(b.logo);
+        if (l.error) return fail(l.error);
+        logo = l.value;
+      }
+      await saveBrand(env, dev, logo);
     } else if (m === 'POST' && (r[2] === 'block' || r[2] === 'unblock')) {
       dev.blocked = r[2] === 'block';
     } else if (m === 'POST' && r[2] === 'move') {
@@ -550,7 +597,8 @@ export default {
         if (!p) return fail('سجّل الدخول', 401);
         const pt = await env.DATA.get('patient:' + p.id, 'json');
         if (!pt) return fail('الحساب غير موجود', 401);
-        return json({ name: pt.name, code: p.id, results: await listResults(env, p.id) });
+        const brand = await getBrand(env, pt.labId);
+        return json({ name: pt.name, code: p.id, lab: { name: brand.labName || '', logo: brand.logo || '' }, results: await listResults(env, p.id) });
       }
 
       if ((r = pathname.match(/^\/api\/files\/(\d{4,6})\/([\w-]+)$/)) && m === 'GET') {

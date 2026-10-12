@@ -1,5 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="14" fill="#0f766e"/>
-  <path d="M26 12h12v4h-2v12l11 20a5 5 0 0 1-4.4 7.4H21.4A5 5 0 0 1 17 48l11-20V16h-2z" fill="#fff"/>
-  <path d="M23 42h18l4 7a1.5 1.5 0 0 1-1.3 2.2H20.3A1.5 1.5 0 0 1 19 49z" fill="#5eead4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="0.55" stop-color="#0d9488"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0d9488"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#032e3d" flood-opacity=".35"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="256" rx="116" fill="url(#gloss)"/>
+  <g filter="url(#sh)">
+    <path d="M172 96H316L376 156V372a40 40 0 0 1-40 40H172a40 40 0 0 1-40-40V136a40 40 0 0 1 40-40Z" fill="#fff"/>
+  </g>
+  <path d="M316 96V140a16 16 0 0 0 16 16H376Z" fill="#cde7ee"/>
+  <path d="M170 252H212L234 196L264 306L286 236L300 252H338" fill="none" stroke="url(#pulse)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="170" y="338" width="104" height="16" rx="8" fill="#cbd9e0"/>
+  <rect x="170" y="366" width="64" height="16" rx="8" fill="#e1eaef"/>
+  <circle cx="368" cy="384" r="60" fill="url(#badge)" stroke="#fff" stroke-width="10"/>
+  <path d="M340 384l20 20l40-44" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

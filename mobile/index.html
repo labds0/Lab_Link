@@ -3,46 +3,100 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#f3f6f9">
+<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="logo.svg">
-<title>Lab Link</title>
+<link rel="icon" id="favicon" href="logo.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>نتائج التحاليل</title>
+<script>
+// يتنفذ قبل الرسم عشان مفيش وميض: الوضع الليلي تلقائي حسب الموبايل أو باختيار المريض
+(function () {
+  var mq = matchMedia('(prefers-color-scheme: dark)');
+  function saved() { try { return localStorage.getItem('theme'); } catch (e) { return null; } }
+  function apply(t) {
+    var dark = t === 'dark' || (t !== 'light' && mq.matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    var m = document.querySelector('meta[name=theme-color]');
+    if (m) m.setAttribute('content', dark ? '#0a1216' : '#f3f6f9');
+  }
+  apply(saved());
+  if (mq.addEventListener) mq.addEventListener('change', function () { if (!saved()) apply(null); });
+  window.toggleTheme = function () {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('theme', next); } catch (e) {}
+    apply(next); document.dispatchEvent(new Event('themechange'));
+  };
+})();
+</script>
 <style>
-:root{--teal:#0f766e;--teal-l:#ccfbf1;--bg:#f3f6f6;--line:#dbe3e3;--txt:#17282a;--mut:#647779;--red:#b91c1c}
-*{box-sizing:border-box}
-body{margin:0;font-family:"Segoe UI",Tahoma,"Noto Naskh Arabic",sans-serif;background:var(--bg);color:var(--txt);font-size:16px;min-height:100vh}
+:root{color-scheme:light;--bg:#f3f6f9;--surface:#fff;--surface-2:#f7f9fb;--line:#e2e8ee;--line-2:#cfd8e1;--txt:#0f1c24;--mut:#64768a;
+--brand:#0d9488;--brand-soft:#e1f6f3;--brand-ink:#0a5f57;--g1:#14b8a6;--g2:#0e7490;--on:#fff;--red:#dc2626;--red-soft:#fdecec;
+--sh:0 1px 2px rgba(15,28,36,.06),0 8px 24px rgba(15,28,36,.07);--hover:#eef3f7}
+:root[data-theme=dark]{color-scheme:dark;--bg:#0a1216;--surface:#111b21;--surface-2:#15232a;--line:#1f3038;--line-2:#2b414b;--txt:#e7f0f3;--mut:#8da2ad;
+--brand:#2dd4bf;--brand-soft:rgba(45,212,191,.13);--brand-ink:#7ff0dd;--g1:#2dd4bf;--g2:#38bdf8;--on:#021b1f;--red:#f87171;--red-soft:rgba(248,113,113,.13);
+--sh:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);--hover:#172830}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{margin:0;font-family:"Segoe UI",system-ui,Tahoma,"Noto Naskh Arabic",sans-serif;background:var(--bg);color:var(--txt);font-size:16px;line-height:1.5;min-height:100vh;
+padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);transition:background .25s,color .25s;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+background:radial-gradient(600px 360px at 90% -5%,color-mix(in srgb,var(--g1) 20%,transparent),transparent 65%),radial-gradient(520px 340px at -5% 105%,color-mix(in srgb,var(--g2) 16%,transparent),transparent 65%)}
 .hidden{display:none!important}
-.wrap{max-width:520px;margin:0 auto;padding:20px}
-.card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.07)}
+svg{width:20px;height:20px;flex:none}
+.wrap{max-width:520px;margin:0 auto;padding:20px 18px 40px}
+.fab{position:fixed;top:calc(12px + env(safe-area-inset-top));left:14px;z-index:5}
+.icon-btn{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:13px;border:1px solid var(--line);background:var(--surface);color:var(--mut);padding:0;box-shadow:var(--sh);cursor:pointer}
+.icon-btn:active{transform:scale(.95)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:34px 24px 26px;box-shadow:var(--sh);animation:rise .35s ease both;margin-top:7vh}
 .center{text-align:center}
-.logo{width:76px;height:76px}
-h1{font-size:22px;margin:10px 0 4px}
-.sub{color:var(--mut);margin:0 0 18px;font-size:14px}
-label{display:block;text-align:right;color:var(--mut);font-size:13px;margin-bottom:12px}
-input{width:100%;margin-top:5px;padding:13px;border:1px solid var(--line);border-radius:10px;font-size:18px;font-family:inherit;text-align:center;letter-spacing:3px;direction:ltr}
-input:focus{outline:2px solid var(--teal-l);border-color:var(--teal)}
-button{font-family:inherit;font-size:16px;border-radius:10px;border:1px solid var(--line);background:#fff;padding:11px 16px;cursor:pointer}
-.primary{background:var(--teal);color:#fff;border-color:var(--teal);width:100%;padding:13px}
-.msg{color:var(--red);min-height:20px;margin:12px 0 0;font-size:14px}
-.bar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.bar img{width:38px;height:38px}
-.bar b{display:block;color:var(--teal)}
-.bar small{color:var(--mut)}
-.bar .sp{flex:1}
-.file{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.mark{width:96px;height:96px;margin:0 auto 14px;border-radius:28px;background:#fff;border:1px solid var(--line);box-shadow:var(--sh);display:grid;place-items:center;overflow:hidden}
+.mark img{width:100%;height:100%;object-fit:contain}
+h1{font-size:24px;font-weight:800;margin:0 0 4px;letter-spacing:-.2px}
+.sub{color:var(--mut);margin:0 0 24px;font-size:14.5px}
+label{display:block;text-align:right;color:var(--mut);font-size:13px;font-weight:600;margin-bottom:14px}
+input{width:100%;margin-top:6px;padding:14px;border:1px solid var(--line);background:var(--surface-2);color:var(--txt);border-radius:14px;font-size:20px;font-family:inherit;text-align:center;letter-spacing:4px;direction:ltr;transition:border-color .15s,box-shadow .15s}
+input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft);background:var(--surface)}
+button{font-family:inherit;font-size:16px;font-weight:700;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--txt);padding:11px 16px;cursor:pointer}
+.primary{background:linear-gradient(135deg,var(--g1),var(--g2));color:var(--on);border:0;width:100%;padding:15px;font-size:17px;box-shadow:0 8px 20px color-mix(in srgb,var(--g2) 32%,transparent)}
+.primary:active{transform:translateY(1px)}
+.msg{color:var(--red);min-height:20px;margin:14px 0 0;font-size:14px}
+
+.bar{display:flex;align-items:center;gap:12px;margin:48px 0 18px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh)}
+.bar .lg{width:50px;height:50px;border-radius:15px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;flex:none}
+.bar .lg img{width:100%;height:100%;object-fit:contain}
+.bar .who{flex:1;min-width:0}
+.bar .who b{display:block;font-size:17px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .who small{color:var(--mut);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .icon-btn{box-shadow:none;width:40px;height:40px}
+.hello{display:flex;align-items:center;gap:12px;margin:0 2px 14px}
+.av{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:18px;color:#fff;background:linear-gradient(135deg,var(--g1),var(--g2));flex:none}
+.hello b{display:block;font-size:17px}.hello small{color:var(--mut);direction:ltr;display:inline-block}
+.sect{margin:6px 4px 10px;color:var(--mut);font-size:13px;font-weight:700}
+.file{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:13px;box-shadow:var(--sh);animation:rise .3s ease both}
+.file .ico{width:46px;height:46px;border-radius:14px;background:var(--red-soft);color:var(--red);display:grid;place-items:center;flex:none}
+.file .ico svg{width:23px;height:23px}
 .file .m{flex:1;min-width:0}
-.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
 .file small{color:var(--mut)}
-.file button{padding:8px 14px;font-size:14px}
-.none{text-align:center;color:var(--mut);padding:50px 10px;background:#fff;border:1px dashed var(--line);border-radius:12px;font-size:17px}
+.file button{padding:9px 16px;font-size:14px;border-radius:12px;background:var(--brand-soft);color:var(--brand-ink);border-color:transparent}
+.none{text-align:center;color:var(--mut);padding:44px 14px;background:var(--surface);border:2px dashed var(--line-2);border-radius:22px;font-size:16px}
+.none .ill{width:62px;height:62px;border-radius:20px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin:0 auto 12px}
+.none .ill svg{width:30px;height:30px}
+.skel{height:76px;border-radius:18px;margin-bottom:10px;background:linear-gradient(90deg,var(--surface) 25%,var(--hover) 50%,var(--surface) 75%);background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<button class="icon-btn fab" id="themeBtn" type="button" aria-label="الوضع الليلي"></button>
 <div class="wrap">
 
   <div id="login" class="card center hidden">
-    <img src="logo.svg" class="logo" alt="">
-    <h1 id="appName">Lab Link</h1>
+    <div class="mark"><img id="loginLogo" src="logo.svg" alt=""></div>
+    <h1 id="appName">نتائج التحاليل</h1>
     <p class="sub">سجّل الدخول بالكود وكلمة السر اللي اتسلموا لك من المعمل</p>
     <form id="loginForm">
       <label>كود المريض<input name="code" inputmode="numeric" maxlength="6" autocomplete="username" required></label>
@@ -54,24 +108,50 @@ button{font-family:inherit;font-size:16px;border-radius:10px;border:1px solid va
 
   <div id="home" class="hidden">
     <div class="bar">
-      <img src="logo.svg" alt="">
-      <div><b id="pname"></b><small id="pcode"></small></div>
-      <span class="sp"></span>
-      <button id="refresh" title="تحديث">↻</button>
-      <button id="logout">خروج</button>
+      <div class="lg"><img id="homeLogo" src="logo.svg" alt=""></div>
+      <div class="who"><b id="labName"></b><small>نتائج التحاليل</small></div>
+      <button class="icon-btn" id="refresh" title="تحديث" aria-label="تحديث"></button>
+      <button class="icon-btn" id="logout" title="خروج" aria-label="خروج"></button>
     </div>
+    <div class="hello"><span class="av" id="av"></span><div><b id="pname"></b><small id="pcode"></small></div></div>
+    <div class="sect" id="sect"></div>
     <div id="list"></div>
   </div>
 </div>
 
 <script>
-const API_URL = 'https://lab-results-api.m-afifi35.workers.dev'; // غيّره لرابط الـ Worker
+const API_URL = 'https://lab-results-api.labds.workers.dev'; // غيّره لرابط الـ Worker
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const set = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const del = (k) => { try { localStorage.removeItem(k); } catch {} };
 let token = get('p_token');
+
+const I = {
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  refresh: '<path d="M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+};
+const ic = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+function syncTheme() { $('#themeBtn').innerHTML = ic(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon'); }
+$('#themeBtn').onclick = () => window.toggleTheme();
+document.addEventListener('themechange', syncTheme);
+$('#refresh').innerHTML = ic('refresh'); $('#logout').innerHTML = ic('logout'); syncTheme();
+
+// هوية المعمل (الاسم + اللوجو): بتتخزن بعد أول دخول فتظهر في شاشة الدخول كمان
+function readBrand() { try { return JSON.parse(get('brand')) || {}; } catch { return {}; } }
+function applyBrand(b) {
+  const name = (b && b.name) || '', logo = (b && b.logo) || '';
+  document.title = name || 'نتائج التحاليل';
+  $('#appName').textContent = name || 'نتائج التحاليل';
+  $('#labName').textContent = name || 'نتائج التحاليل';
+  $('#loginLogo').src = $('#homeLogo').src = logo || 'logo.svg';
+  const fav = $('#favicon'); fav.removeAttribute('type'); fav.href = logo || 'logo.svg';
+}
+applyBrand(readBrand());
 
 async function api(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
@@ -90,15 +170,18 @@ function logout() { token = null; del('p_token'); $('#home').classList.add('hidd
 
 async function load() {
   $('#login').classList.add('hidden'); $('#home').classList.remove('hidden');
-  $('#list').innerHTML = '<div class="none">...</div>';
+  $('#list').innerHTML = '<div class="skel"></div><div class="skel"></div>';
   try {
     const d = await (await api('/api/patient/results')).json();
+    if (d.lab) { set('brand', JSON.stringify(d.lab)); applyBrand(d.lab); }
     $('#pname').textContent = d.name; $('#pcode').textContent = 'كود: ' + d.code;
+    $('#av').textContent = [...String(d.name).trim()][0] || '؟';
+    $('#sect').textContent = d.results.length ? `نتائجك (${d.results.length})` : '';
     $('#list').innerHTML = d.results.length ? d.results.map((r) =>
-      `<div class="file" data-id="${esc(r.id)}"><span style="font-size:24px">📄</span>
+      `<div class="file" data-id="${esc(r.id)}"><span class="ico">${ic('file')}</span>
         <div class="m"><b>${esc(r.name)}</b><small>${fmtDate(r.date)}</small></div>
         <button data-v="${esc(r.id)}">فتح</button></div>`).join('')
-      : '<div class="none">لا توجد نتائج حتى الآن</div>';
+      : `<div class="none"><div class="ill">${ic('file')}</div>لا توجد نتائج حتى الآن</div>`;
     $('#list').querySelectorAll('[data-v]').forEach((b) => b.onclick = () => openPdf(d.code, b.dataset.v, b));
   } catch (e) { if (token) $('#list').innerHTML = `<div class="none">${esc(e.message)}</div>`; }
 }
@@ -126,7 +209,15 @@ $('#logout').onclick = logout;
 $('#refresh').onclick = load;
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-if (token) load(); else $('#login').classList.remove('hidden');
+// دخول تلقائي من الرابط: ...#c=123456&p=654321
+const h = new URLSearchParams(location.hash.slice(1));
+if (h.get('c') && h.get('p')) {
+  history.replaceState(null, '', location.pathname + location.search);
+  del('p_token'); token = null;
+  $('#login').classList.remove('hidden');
+  const f = $('#loginForm'); f.code.value = h.get('c'); f.password.value = h.get('p');
+  f.requestSubmit();
+} else if (token) load(); else $('#login').classList.remove('hidden');
 </script>
 </body>
 </html>

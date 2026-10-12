@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, nativeTheme } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -68,6 +68,8 @@ ipcMain.on('update:install', () => autoUpdater.quitAndInstall(true, true));
 
 function createWindow() {
   win = new BrowserWindow({
+    icon: path.join(__dirname, 'renderer', 'icon.png'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a1216' : '#f3f6f9',
     width: 1200,
     height: 760,
     minWidth: 900,
