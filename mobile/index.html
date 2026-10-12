@@ -81,6 +81,11 @@ button{font-family:inherit;font-size:16px;font-weight:700;border-radius:14px;bor
 .file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
 .file small{color:var(--mut)}
 .file button{padding:9px 16px;font-size:14px;border-radius:12px;background:var(--brand-soft);color:var(--brand-ink);border-color:transparent}
+.file .acts{display:flex;gap:8px;flex:none}
+.file button.dl{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--g1),var(--g2));color:var(--on)}
+.file button.dl svg{width:16px;height:16px}
+.file button:disabled{opacity:.6;cursor:default}
+@media(max-width:400px){.file{gap:10px;padding:12px}.file .ico{width:40px;height:40px}.file button{padding:9px 12px}}
 .none{text-align:center;color:var(--mut);padding:44px 14px;background:var(--surface);border:2px dashed var(--line-2);border-radius:22px;font-size:16px}
 .none .ill{width:62px;height:62px;border-radius:20px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin:0 auto 12px}
 .none .ill svg{width:30px;height:30px}
@@ -134,6 +139,7 @@ const I = {
   refresh: '<path d="M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 function syncTheme() { $('#themeBtn').innerHTML = ic(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon'); }
@@ -180,9 +186,10 @@ async function load() {
     $('#list').innerHTML = d.results.length ? d.results.map((r) =>
       `<div class="file" data-id="${esc(r.id)}"><span class="ico">${ic('file')}</span>
         <div class="m"><b>${esc(r.name)}</b><small>${fmtDate(r.date)}</small></div>
-        <button data-v="${esc(r.id)}">فتح</button></div>`).join('')
+        <div class="acts"><button data-v="${esc(r.id)}">فتح</button><button class="dl" data-d="${esc(r.id)}" data-n="${esc(r.name)}" aria-label="تنزيل ${esc(r.name)}">${ic('download')}<span>تنزيل</span></button></div></div>`).join('')
       : `<div class="none"><div class="ill">${ic('file')}</div>لا توجد نتائج حتى الآن</div>`;
     $('#list').querySelectorAll('[data-v]').forEach((b) => b.onclick = () => openPdf(d.code, b.dataset.v, b));
+    $('#list').querySelectorAll('[data-d]').forEach((b) => b.onclick = () => downloadPdf(d.code, b.dataset.d, b.dataset.n, b));
   } catch (e) { if (token) $('#list').innerHTML = `<div class="none">${esc(e.message)}</div>`; }
 }
 
@@ -195,6 +202,27 @@ async function openPdf(code, id, btn) {
     if (!w) { const a = document.createElement('a'); a.href = url; a.download = 'result.pdf'; a.click(); }
   } catch (e) { alert(e.message); }
   btn.textContent = old; btn.disabled = false;
+}
+
+// تنزيل مباشر للملف على الجهاز من غير ما يتفتح في عارض الـ PDF
+async function downloadPdf(code, id, name, btn) {
+  const label = btn.querySelector('span'), old = label.textContent;
+  label.textContent = '...'; btn.disabled = true;
+  try {
+    const res = await api(`/api/files/${code}/${id}`);
+    const blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (String(name || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'result') + '.pdf';
+    a.rel = 'noopener'; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    label.textContent = 'تم ✓';
+    setTimeout(() => { label.textContent = old; btn.disabled = false; }, 1600);
+    return;
+  } catch (e) { alert(e.message); }
+  label.textContent = old; btn.disabled = false;
 }
 
 $('#loginForm').addEventListener('submit', async (e) => {
