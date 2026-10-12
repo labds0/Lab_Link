@@ -46,7 +46,10 @@ const send = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send
 
 function setupUpdater() {
   if (!app.isPackaged) return; // التحديث بيشتغل في النسخة المثبتة بس
-  autoUpdater.setFeedURL({ provider: 'generic', url: config.API_URL.replace(/\/$/, '') + '/updates' });
+  // التحديثات بتتسحب من GitHub Releases (المستودع لازم يكون Public)
+  const [owner, repo] = String(config.GITHUB_REPO || '').split('/');
+  if (!owner || !repo) return;
+  autoUpdater.setFeedURL({ provider: 'github', owner, repo });
   autoUpdater.autoDownload = false;
   autoUpdater.on('update-available', (i) => send('update:available', { version: i.version }));
   autoUpdater.on('update-not-available', () => send('update:none'));

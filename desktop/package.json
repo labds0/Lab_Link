@@ -19,7 +19,7 @@
     "appId": "com.labresults.desktop",
     "productName": "Lab Link",
     "files": ["main.js", "serial.js", "preload.js", "app-config.json", "renderer/**/*"],
-    "publish": [{ "provider": "generic", "url": "https://example.invalid/updates" }],
+    "publish": [{ "provider": "github", "owner": "labds0", "repo": "Lab_Link" }],
     "win": { "target": "nsis", "icon": "renderer/icon.png" },
     "nsis": {
       "oneClick": false,

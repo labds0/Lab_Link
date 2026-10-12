@@ -1,4 +1,4 @@
-// Lab Link API — Cloudflare Worker + KV (DATA) + R2 (FILES)
+// Lab Link API — Cloudflare Worker + KV (DATA) — ملفات الـ PDF بتتخزن في KV كمان (من غير R2)
 // Secrets: SECRET (توقيع الجلسات + توليد أكواد التفعيل: ماتغيّروش بعد ما تفعّل أجهزة), ADMIN_KEY (لوحة الأدمن بتاعتك)
 // كل معمل = جهاز بسيريال ثابت. التفعيل بكود مرتبط بالسيريال، والدخول بيوزر/باسورد جوا الجهاز ده بس.
 
@@ -437,32 +437,6 @@ async function adminApi(req, env, pathname) {
   return fail('غير موجود', 404);
 }
 
-/* ---------- تحديثات البرنامج (ملفات في R2 تحت updates/) ---------- */
-async function serveUpdate(req, env, name) {
-  const obj = await env.FILES.get('updates/' + name, { range: req.headers });
-  if (!obj) return fail('غير موجود', 404);
-  const isYml = name.endsWith('.yml');
-  const h = {
-    ...CORS,
-    'Content-Type': isYml ? 'text/yaml; charset=utf-8' : 'application/octet-stream',
-    'Accept-Ranges': 'bytes',
-    'Cache-Control': isYml ? 'no-cache' : 'public, max-age=3600',
-  };
-  if (obj.httpEtag) h.ETag = obj.httpEtag;
-  let status = 200;
-  const rg = obj.range;
-  if (rg && req.headers.get('Range')) {
-    const start = rg.suffix !== undefined ? obj.size - rg.suffix : rg.offset || 0;
-    const len = rg.suffix !== undefined ? rg.suffix : rg.length ?? obj.size - start;
-    h['Content-Range'] = `bytes ${start}-${start + len - 1}/${obj.size}`;
-    h['Content-Length'] = String(len);
-    status = 206;
-  } else if (obj.size !== undefined) {
-    h['Content-Length'] = String(obj.size);
-  }
-  return new Response(req.method === 'HEAD' ? null : obj.body, { status, headers: h });
-}
-
 async function createPatient(req, env, me) {
   const b = await readJson(req);
   const name = clean(b.name, 100);
@@ -506,7 +480,7 @@ async function deletePatient(env, me, code) {
   const p = await getOwnedPatient(env, me.id, code);
   if (!p) return fail('المريض غير موجود', 404);
   for (const k of await listAll(env, `res:${code}:`)) {
-    await env.FILES.delete(`${code}/${k.metadata?.id}.pdf`);
+    await env.DATA.delete(`file:${code}:${k.metadata?.id}`);
     await env.DATA.delete(k.name);
   }
   await env.DATA.delete('patient:' + code);
@@ -538,7 +512,7 @@ async function uploadResult(req, env, me, code) {
   const id = crypto.randomUUID();
   const name = clean(form.get('name') || file.name || 'نتيجة', 100).replace(/\.pdf$/i, '');
   const meta = { id, name, size: buf.byteLength, date: Date.now() };
-  await env.FILES.put(`${code}/${id}.pdf`, buf, { httpMetadata: { contentType: 'application/pdf' } });
+  await env.DATA.put(`file:${code}:${id}`, buf);
   await env.DATA.put(`res:${code}:${id}`, '1', { metadata: meta });
   return json(meta);
 }
@@ -546,7 +520,7 @@ async function uploadResult(req, env, me, code) {
 async function deleteResult(env, me, code, id) {
   const p = await getOwnedPatient(env, me.id, code);
   if (!p) return fail('المريض غير موجود', 404);
-  await env.FILES.delete(`${code}/${id}.pdf`);
+  await env.DATA.delete(`file:${code}:${id}`);
   await env.DATA.delete(`res:${code}:${id}`);
   return json({ ok: true });
 }
@@ -569,9 +543,9 @@ async function patientLogin(req, env) {
 
 async function serveFile(env, p, code, id) {
   if (p.role === 'patient' ? p.id !== code : !(await getOwnedPatient(env, p.id, code))) return fail('غير مسموح', 403);
-  const obj = await env.FILES.get(`${code}/${id}.pdf`);
-  if (!obj) return fail('الملف غير موجود', 404);
-  return new Response(obj.body, {
+  const buf = await env.DATA.get(`file:${code}:${id}`, 'arrayBuffer');
+  if (!buf) return fail('الملف غير موجود', 404);
+  return new Response(buf, {
     headers: { ...CORS, 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline', 'Cache-Control': 'private, no-store' },
   });
 }
@@ -586,7 +560,6 @@ export default {
     let r;
     try {
       if (pathname.startsWith('/api/admin/')) return await adminApi(req, env, pathname);
-      if ((r = pathname.match(/^\/updates\/([\w.\-]+)$/)) && (m === 'GET' || m === 'HEAD')) return await serveUpdate(req, env, r[1]);
       if (pathname === '/api/device/status' && m === 'GET') return await deviceStatus(req, env);
       if (pathname === '/api/device/activate' && m === 'POST') return await deviceActivate(req, env);
       if (pathname === '/api/lab/login' && m === 'POST') return await labLogin(req, env);
