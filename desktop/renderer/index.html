@@ -70,6 +70,14 @@
         <input id="search" class="search" placeholder="بحث بالاسم أو الكود">
       </div>
       <ul id="patientList"></ul>
+      <div id="dayPanel" class="daypanel">
+        <div class="daysum">
+          <span class="dsi"><i data-i="calendar"></i></span>
+          <div class="dst"><b id="dayTitle"></b><small id="dayCount"></small></div>
+        </div>
+        <button id="dayToggle" type="button" class="btn block"><i data-i="calendar"></i><span id="dayToggleTxt">اختر اليوم</span><i data-i="chev" class="chev"></i></button>
+        <div id="cal" class="cal hidden"></div>
+      </div>
     </aside>
     <main id="results" class="results"></main>
   </div>

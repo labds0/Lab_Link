@@ -126,11 +126,11 @@ label input, label select { margin-top: 6px; font-weight: 400; }
 .warnbar { background: var(--warn-bg); color: var(--warn-txt); border-bottom: 1px solid var(--warn-line); padding: 9px 22px; display: flex; gap: 12px; align-items: center; font-size: 14px; font-weight: 600; }
 
 .layout { flex: 1; display: grid; grid-template-columns: 330px 1fr; min-height: 0; } /* RTL: العمود الأول على اليمين */
-.patients { background: var(--surface); border-left: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.patients { background: var(--surface); border-left: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
 .search-wrap { position: relative; }
 .search-wrap svg { position: absolute; top: 50%; right: 13px; transform: translateY(-50%); color: var(--mut); pointer-events: none; }
 .search { margin: 0; padding-right: 40px; }
-#patientList { list-style: none; margin: 0; padding: 2px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+#patientList { list-style: none; margin: 0; padding: 2px; overflow-y: auto; flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 3px; }
 #patientList li { padding: 9px 10px; border-radius: 11px; cursor: pointer; display: flex; align-items: center; gap: 11px; transition: background .12s; border: 1px solid transparent; }
 #patientList li:hover { background: var(--hover); }
 #patientList li.active { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 30%, transparent); }
@@ -167,6 +167,38 @@ li.active .pn b { color: var(--brand-ink); }
 .noresults .ill { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 12px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
 .noresults .ill svg { width: 30px; height: 30px; }
 .noresults p { font-size: 16px; color: var(--mut); margin: 0 0 16px; }
+
+/* ============ فلتر اليوم + التقويم ============ */
+.daypanel { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.daysum { display: flex; align-items: center; gap: 11px; }
+.dsi { width: 38px; height: 38px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; }
+.dst { min-width: 0; display: flex; flex-direction: column; }
+.dst b { font-size: 14px; line-height: 1.35; }
+.dst small { color: var(--mut); font-size: 12.5px; }
+#dayToggle .chev { margin-inline-start: auto; transition: transform .2s; }
+#dayToggle.open .chev { transform: rotate(180deg); }
+.cal { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px; animation: rise .18s ease both; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cal-head b { font-size: 14px; }
+.cal-nav { width: 30px; height: 30px; border-radius: 9px; border: 0; background: transparent; color: var(--mut); display: grid; place-items: center; }
+.cal-nav:hover { background: var(--hover); color: var(--txt); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-grid .dn { font-size: 11.5px; color: var(--mut); font-weight: 700; padding: 4px 0; }
+.cal-grid button.d { position: relative; aspect-ratio: 1; border: 0; border-radius: 9px; background: transparent; color: var(--txt); font-size: 13px; font-weight: 600; padding: 0; }
+.cal-grid button.d:hover { background: var(--hover); }
+.cal-grid button.d.today { box-shadow: inset 0 0 0 1.5px var(--brand); }
+.cal-grid button.d.rng { background: var(--brand-soft); border-radius: 0; color: var(--brand-ink); }
+.cal-grid button.d.sel { background: linear-gradient(135deg, var(--g1), var(--g2)); color: var(--on-brand); border-radius: 9px; }
+:root[data-theme="dark"] .cal-grid button.d.sel { color: #021b1f; }
+.cal-grid button.d.has::after { content: ""; position: absolute; bottom: 3px; left: 50%; translate: -50% 0; width: 4px; height: 4px; border-radius: 50%; background: var(--brand); }
+.cal-grid button.d.sel.has::after { background: currentColor; }
+.cal-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--hover); padding: 3px; border-radius: 10px; margin-top: 10px; }
+.cal-seg button { border: 0; background: transparent; color: var(--mut); padding: 6px; border-radius: 8px; font-size: 13px; font-weight: 700; }
+.cal-seg button.on { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow-s); }
+.cal-hint { color: var(--mut); font-size: 12px; margin: 8px 2px 0; text-align: center; min-height: 18px; }
+.cal-quick { display: flex; gap: 6px; margin-top: 8px; }
+.cal-quick .btn { flex: 1; }
+#patientList li .tm { color: var(--mut); font-size: 12px; direction: ltr; }
 
 /* ============ Modal / Toast ============ */
 .modal { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 20px; z-index: 10; animation: fade .15s ease both; }

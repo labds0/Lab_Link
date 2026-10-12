@@ -30,6 +30,10 @@ const ICONS = {
   chat: '<path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 20.5l1.7-5.4A8.4 8.4 0 1 1 21 11.5z"/>',
   refresh: '<path d="M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>',
+  chevR: '<path d="M9 18l6-6-6-6"/>',
+  chevL: '<path d="M15 18l-6-6 6-6"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -366,12 +370,86 @@ async function loadPatients() {
     renderPatients();
   } catch (err) { toast(err.message); }
 }
+/* ---------- فلتر اليوم / الفترة (من - إلى) ---------- */
+const pad2 = (n) => String(n).padStart(2, '0');
+const dkey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const todayKey = () => dkey(new Date());
+const keyDate = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const nfAr = new Intl.NumberFormat('ar-EG');
+const fmtDay = (k) => keyDate(k).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const fmtShortDay = (k) => keyDate(k).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' });
+// auto = بيتابع "النهاردة" (حتى لو البرنامج فضل مفتوح بعد منتصف الليل)
+let flt = { auto: true, all: false, from: '', to: '' };
+let calMode = 'day', calOpen = false, calView = new Date(), pendingFrom = null, lastDay = todayKey();
+const fltRange = () => (flt.auto ? { from: todayKey(), to: todayKey() } : flt);
+const inFilter = (p) => { if (flt.all) return true; const k = dkey(new Date(p.created)); const r = fltRange(); return k >= r.from && k <= r.to; };
+function setToday() { flt = { auto: true, all: false, from: '', to: '' }; pendingFrom = null; calView = new Date(); }
+
+function renderDay() {
+  const r = fltRange();
+  const n = patients.filter(inFilter).length;
+  const t = todayKey();
+  $('#dayTitle').textContent = flt.all ? 'كل المرضى'
+    : r.from === r.to ? (r.from === t ? 'اليوم • ' : '') + fmtDay(r.from)
+    : `من ${fmtShortDay(r.from)} إلى ${fmtShortDay(r.to)}`;
+  $('#dayCount').textContent = n ? `${nfAr.format(n)} مريض` : 'لا يوجد مرضى';
+  $('#dayToggleTxt').textContent = calOpen ? 'إغلاق التقويم' : (r.from !== r.to || flt.all) ? 'تغيير الفترة' : 'اختر اليوم';
+  $('#dayToggle').classList.toggle('open', calOpen);
+  $('#cal').classList.toggle('hidden', !calOpen);
+  if (calOpen) renderCal();
+}
+function renderCal() {
+  const y = calView.getFullYear(), m = calView.getMonth();
+  const counts = {};
+  patients.forEach((p) => { const k = dkey(new Date(p.created)); counts[k] = (counts[k] || 0) + 1; });
+  const offset = (new Date(y, m, 1).getDay() + 1) % 7; // الأسبوع بيبدأ السبت
+  const total = new Date(y, m + 1, 0).getDate();
+  const r = fltRange(), t = todayKey();
+  const from = pendingFrom || (flt.all ? '' : r.from), to = pendingFrom ? pendingFrom : (flt.all ? '' : r.to);
+  let cells = '';
+  for (let i = 0; i < offset; i++) cells += '<span></span>';
+  for (let d = 1; d <= total; d++) {
+    const k = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+    const cls = ['d', k === t ? 'today' : '', counts[k] ? 'has' : '', k === from || k === to ? 'sel' : from && k > from && k < to ? 'rng' : ''].join(' ');
+    cells += `<button type="button" class="${cls}" data-k="${k}" title="${counts[k] ? nfAr.format(counts[k]) + ' مريض' : ''}">${nfAr.format(d)}</button>`;
+  }
+  const hint = calMode === 'range' ? (pendingFrom ? `من ${fmtShortDay(pendingFrom)} — اختر يوم النهاية` : 'اختر يوم البداية ثم يوم النهاية') : 'اضغط على اليوم لعرض مرضاه';
+  $('#cal').innerHTML = `<div class="cal-head">
+      <button type="button" class="cal-nav" data-nav="-1" title="الشهر السابق">${ic('chevR')}</button>
+      <b>${calView.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}</b>
+      <button type="button" class="cal-nav" data-nav="1" title="الشهر التالي">${ic('chevL')}</button></div>
+    <div class="cal-grid">${['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'].map((x) => `<span class="dn">${x}</span>`).join('')}${cells}</div>
+    <div class="cal-seg"><button type="button" data-mode="day" class="${calMode === 'day' ? 'on' : ''}">يوم واحد</button><button type="button" data-mode="range" class="${calMode === 'range' ? 'on' : ''}">من — إلى</button></div>
+    <div class="cal-hint">${hint}</div>
+    <div class="cal-quick"><button type="button" class="btn sm" data-q="today">اليوم</button><button type="button" class="btn sm" data-q="all">كل المرضى</button></div>`;
+}
+$('#dayToggle').onclick = () => { calOpen = !calOpen; pendingFrom = null; renderDay(); };
+$('#cal').addEventListener('click', (e) => {
+  const nav = e.target.closest('[data-nav]'), mode = e.target.closest('[data-mode]'), q = e.target.closest('[data-q]'), day = e.target.closest('[data-k]');
+  if (nav) { calView = new Date(calView.getFullYear(), calView.getMonth() + Number(nav.dataset.nav), 1); renderCal(); }
+  else if (mode) { calMode = mode.dataset.mode; pendingFrom = null; renderCal(); }
+  else if (q) { if (q.dataset.q === 'today') setToday(); else { flt = { auto: false, all: true, from: '', to: '' }; pendingFrom = null; } calOpen = false; renderPatients(); }
+  else if (day) {
+    const k = day.dataset.k;
+    if (calMode === 'range' && !pendingFrom) { pendingFrom = k; renderCal(); return; }
+    if (calMode === 'range') { flt = { auto: false, all: false, from: k < pendingFrom ? k : pendingFrom, to: k < pendingFrom ? pendingFrom : k }; pendingFrom = null; }
+    else if (k === todayKey()) setToday();
+    else flt = { auto: false, all: false, from: k, to: k };
+    calOpen = false; renderPatients();
+  }
+});
+setInterval(() => { if (flt.auto && lastDay !== todayKey()) { lastDay = todayKey(); renderPatients(); } }, 60000);
+
 function renderPatients() {
   const q = $('#search').value.trim().toLowerCase();
-  const list = patients.filter((p) => !q || p.name.toLowerCase().includes(q) || p.code.includes(q));
+  // البحث بيدوّر في كل المرضى، ومن غير بحث بيظهر مرضى اليوم/الفترة المختارة بس (الأحدث فوق)
+  const list = q
+    ? patients.filter((p) => p.name.toLowerCase().includes(q) || p.code.includes(q))
+    : patients.filter(inFilter).sort((a, b) => b.created - a.created);
+  renderDay();
   $('#patientList').innerHTML = list.length
-    ? list.map((p) => `<li data-code="${esc(p.code)}" class="${selected?.code === p.code ? 'active' : ''}">${avatar(p.name)}<span class="pn"><b>${esc(p.name)}</b><small>${esc(p.code)}</small></span></li>`).join('')
-    : '<li class="none">لا يوجد مرضى</li>';
+    ? list.map((p) => `<li data-code="${esc(p.code)}" class="${selected?.code === p.code ? 'active' : ''}">${avatar(p.name)}<span class="pn"><b>${esc(p.name)}</b><small>${esc(p.code)}</small></span><span class="tm">${new Date(p.created).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span></li>`).join('')
+    : `<li class="none">${q ? 'لا توجد نتائج للبحث' : 'لا يوجد مرضى في هذه الفترة'}</li>`;
 }
 $('#search').addEventListener('input', renderPatients);
 $('#patientList').addEventListener('click', (e) => {
@@ -447,6 +525,7 @@ $('#newPatientBtn').onclick = () => {
       const d = await (await api('/api/lab/patients', { method: 'POST', body: { name } })).json();
       $('#modalCard').innerHTML = credsHtml(d, 'تم إنشاء المريض');
       bindCreds(d);
+      setToday();
       await loadPatients();
       selectPatient({ code: d.code, name: d.name });
     } catch (err) { toast(err.message); }
