@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https: http://localhost:*; img-src 'self' data: blob:; frame-src blob:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Link</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section id="auth" class="auth hidden">
+  <div class="auth-card">
+    <img src="logo.svg" class="logo-lg" alt="">
+    <h1 id="authTitle"></h1>
+
+    <!-- تفعيل الجهاز (أول مرة بس) -->
+    <div id="activateBox" class="hidden">
+      <p class="sub">البرنامج محتاج تفعيل. ابعت رقم الجهاز ده للشركة المزودة وهيرجعولك كود التفعيل.</p>
+      <div class="serial-box">
+        <span>رقم الجهاز</span>
+        <b id="serialText"></b>
+        <button type="button" class="btn sm" id="copySerial">نسخ</button>
+      </div>
+      <form id="activateForm">
+        <label>كود التفعيل<input name="code" dir="ltr" placeholder="XXXX-XXXX-XXXX" autocomplete="off" required></label>
+        <button class="btn primary" type="submit">تفعيل</button>
+      </form>
+    </div>
+
+    <!-- تسجيل الدخول -->
+    <form id="loginForm" class="hidden">
+      <label>اسم المستخدم<input name="username" dir="ltr" autocomplete="username" required></label>
+      <label>كلمة السر<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" type="submit">دخول</button>
+    </form>
+
+    <p id="authMsg" class="msg"></p>
+    <button id="retryBtn" class="btn hidden" type="button">إعادة المحاولة</button>
+  </div>
+</section>
+
+<section id="main" class="main hidden">
+  <header class="topbar">
+    <img src="logo.svg" class="logo-sm" alt="">
+    <div class="brand">
+      <strong id="appName"></strong>
+      <span id="labInfo"></span>
+    </div>
+    <span id="ver" class="ver"></span>
+    <button id="updBtn" class="btn ghost sm">التحقق من تحديث</button>
+    <button id="settingsBtn" class="btn">الإعدادات</button>
+    <button id="logoutBtn" class="btn ghost">تسجيل الخروج</button>
+  </header>
+  <div id="pwWarn" class="warnbar hidden">
+    <span>كلمة السر الحالية هي الافتراضية (1234). غيّرها من الإعدادات عشان الأمان.</span>
+    <button class="btn sm" id="pwWarnBtn">تغيير الآن</button>
+  </div>
+
+  <div class="layout">
+    <aside class="patients">
+      <button id="newPatientBtn" class="btn primary block">+ مريض جديد</button>
+      <input id="search" class="search" placeholder="بحث بالاسم أو الكود">
+      <ul id="patientList"></ul>
+    </aside>
+    <main id="results" class="results">
+      <div class="empty">اختار مريض من القائمة</div>
+    </main>
+  </div>
+</section>
+
+<div id="updBar" class="updbar hidden"></div>
+<div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
+<div id="toast" class="toast hidden"></div>
+<div id="printArea"></div>
+<input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
+
+<script src="app.js"></script>
+</body>
+</html>

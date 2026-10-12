@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Link - لوحة التفعيل (للأدمن)</title>
+<style>
+:root{--teal:#0f766e;--bg:#f3f6f6;--line:#dbe3e3;--txt:#17282a;--mut:#647779;--red:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--txt);padding:24px}
+.wrap{max-width:980px;margin:0 auto}
+.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 4px 18px rgba(0,0,0,.06)}
+h1{margin:0 0 6px;font-size:22px}h2{margin:0 0 14px;font-size:17px}
+.sub{color:var(--mut);margin:0 0 14px;font-size:14px}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
+input{width:100%;margin-top:4px;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+button{font-family:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
+button.p{background:var(--teal);border-color:var(--teal);color:#fff}
+button.d{color:var(--red);border-color:#f0c8c8}
+button.s{padding:4px 10px;font-size:13px}
+.msg{min-height:20px;margin-top:10px;font-size:14px;color:var(--red)}.msg.ok{color:var(--teal)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:right;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mut);font-weight:600;font-size:13px}
+.mono{direction:ltr;font-family:Consolas,monospace;letter-spacing:1px;white-space:nowrap}
+.tag{border-radius:20px;padding:2px 10px;font-size:12px}
+.on{background:#ccfbf1;color:#115e59}.off{background:#e8eef0;color:var(--mut)}.blk{background:#fee2e2;color:var(--red)}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.big{font-size:22px;font-weight:700;direction:ltr;letter-spacing:3px;color:var(--teal)}
+.res{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px;margin-top:14px}
+@media(max-width:700px){.g2,.g3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lab Link - لوحة تفعيل المعامل</h1>
+  <p class="sub">للأدمن بس. افتح الملف ده من جهازك، ماترفعوش على أي موقع.</p>
+
+  <div class="card">
+    <div class="g2">
+      <label>رابط السيرفر (Worker)<input id="api" dir="ltr" placeholder="https://lab-results-api.xxx.workers.dev"></label>
+      <label>ADMIN_KEY<input id="key" type="password" dir="ltr"></label>
+    </div>
+    <button class="p" id="connect">اتصال وعرض الأجهزة</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>إضافة معمل جديد (جهاز جديد)</h2>
+    <p class="sub">المعمل يبعتلك "رقم الجهاز" اللي بيظهر في شاشة التفعيل، وإنت تسجله هنا وتبعتله كود التفعيل.</p>
+    <form id="addForm">
+      <div class="g3">
+        <label>رقم الجهاز (من شاشة التفعيل)<input name="serial" dir="ltr" placeholder="XXXX-XXXX-XXXX-XXXX" required></label>
+        <label>اسم المعمل<input name="labName" required></label>
+        <label>رقم الفرع<input name="branch" required></label>
+      </div>
+      <label>العنوان (اختياري)<input name="address"></label>
+      <button class="p" type="submit">إنشاء كود التفعيل</button>
+    </form>
+    <div id="result"></div>
+  </div>
+
+  <div class="card">
+    <h2>الأجهزة</h2>
+    <table>
+      <thead><tr><th>المعمل</th><th>الفرع</th><th>رقم الجهاز</th><th>كود التفعيل</th><th>الحالة</th><th></th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" style="color:var(--mut)">اضغط "اتصال" الأول</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const get = (k) => { try { return sessionStorage.getItem(k) || ''; } catch { return ''; } };
+const set = (k, v) => { try { sessionStorage.setItem(k, v); } catch {} };
+$('#api').value = get('api'); $('#key').value = get('key');
+let devices = [];
+
+function msg(t, ok) { const m = $('#msg'); m.textContent = t; m.className = 'msg' + (ok ? ' ok' : ''); }
+async function call(method, path, body) {
+  const base = $('#api').value.trim().replace(/\/$/, '');
+  let res;
+  try {
+    res = await fetch(base + path, { method, headers: { 'X-Admin-Key': $('#key').value, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  } catch { throw new Error('مفيش اتصال بالسيرفر، راجع الرابط'); }
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error || 'خطأ ' + res.status);
+  return d;
+}
+async function load() {
+  try {
+    devices = (await call('GET', '/api/admin/devices')).devices;
+    set('api', $('#api').value.trim()); set('key', $('#key').value);
+    msg('متصل', true); render();
+  } catch (e) { msg(e.message); }
+}
+function status(d) { return d.blocked ? '<span class="tag blk">موقوف</span>' : d.activatedAt ? '<span class="tag on">مفعّل</span>' : '<span class="tag off">لسه ما اتفعّلش</span>'; }
+function render() {
+  $('#rows').innerHTML = devices.length ? devices.map((d) => `<tr data-s="${esc(d.serial)}">
+    <td>${esc(d.labName)}</td><td>${esc(d.branch)}</td>
+    <td class="mono">${esc(d.serial)}</td>
+    <td class="mono"><b>${esc(d.code)}</b> <button class="s" data-a="copy">نسخ</button></td>
+    <td>${status(d)}</td>
+    <td><div class="acts">
+      <button class="s" data-a="edit">تعديل</button>
+      <button class="s" data-a="${d.blocked ? 'unblock' : 'block'}">${d.blocked ? 'تشغيل' : 'إيقاف'}</button>
+      <button class="s" data-a="move">نقل لسيريال جديد</button>
+      <button class="s d" data-a="reset">إرجاع admin/1234</button>
+    </div></td></tr>`).join('') : '<tr><td colspan="6" style="color:var(--mut)">لا توجد أجهزة</td></tr>';
+}
+$('#connect').onclick = load;
+$('#addForm').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const d = await call('POST', '/api/admin/devices', Object.fromEntries(new FormData(e.target)));
+    e.target.reset();
+    $('#result').innerHTML = `<div class="res">ابعت للمعمل (${esc(d.labName)}) كود التفعيل ده:<div class="big">${esc(d.code)}</div>
+      <p class="sub" style="margin:8px 0 0">بعد التفعيل يدخل باليوزر <b>admin</b> وكلمة السر <b>1234</b> ويغيّرهم من الإعدادات.</p></div>`;
+    load();
+  } catch (err) { msg(err.message); }
+};
+$('#rows').onclick = async (e) => {
+  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const tr = b.closest('tr'); const s = tr.dataset.s; const d = devices.find((x) => x.serial === s); const a = b.dataset.a;
+  try {
+    if (a === 'copy') { await navigator.clipboard.writeText(d.code); msg('تم نسخ الكود', true); return; }
+    if (a === 'edit') {
+      const labName = prompt('اسم المعمل', d.labName); if (labName === null) return;
+      const branch = prompt('رقم الفرع', d.branch); if (branch === null) return;
+      const address = prompt('العنوان', d.address || ''); if (address === null) return;
+      await call('POST', '/api/admin/devices/' + s, { labName, branch, address });
+    } else if (a === 'move') {
+      const newSerial = prompt('اكتب السيريال الجديد للجهاز (بعد تغيير الهارد أو اللوحة الأم). البيانات والمستخدمين هتفضل، والمعمل هيحتاج كود التفعيل الجديد:'); if (!newSerial) return;
+      const d2 = await call('POST', `/api/admin/devices/${s}/move`, { newSerial });
+      $('#result').innerHTML = `<div class="res">كود التفعيل الجديد للمعمل (${esc(d2.labName)}):<div class="big">${esc(d2.code)}</div></div>`;
+    } else if (a === 'reset') {
+      if (!confirm('إرجاع المستخدم admin بكلمة السر 1234 للمعمل ده؟')) return;
+      await call('POST', `/api/admin/devices/${s}/reset-admin`);
+    } else await call('POST', `/api/admin/devices/${s}/${a}`);
+    load();
+  } catch (err) { msg(err.message); }
+};
+</script>
+</body>
+</html>

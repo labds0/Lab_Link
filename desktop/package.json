@@ -1,0 +1,30 @@
+{
+  "name": "lab-link",
+  "version": "1.0.0",
+  "description": "Lab Link - lab results delivery app",
+  "main": "main.js",
+  "author": "Lab Link",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.labresults.desktop",
+    "productName": "Lab Link",
+    "files": ["main.js", "serial.js", "preload.js", "app-config.json", "renderer/**/*"],
+    "publish": [{ "provider": "generic", "url": "https://example.invalid/updates" }],
+    "win": { "target": "nsis", "icon": "renderer/icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "LabLink-Setup-${version}.${ext}"
+    }
+  }
+}

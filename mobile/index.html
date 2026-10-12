@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="logo.svg">
+<title>Lab Link</title>
+<style>
+:root{--teal:#0f766e;--teal-l:#ccfbf1;--bg:#f3f6f6;--line:#dbe3e3;--txt:#17282a;--mut:#647779;--red:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Tahoma,"Noto Naskh Arabic",sans-serif;background:var(--bg);color:var(--txt);font-size:16px;min-height:100vh}
+.hidden{display:none!important}
+.wrap{max-width:520px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.07)}
+.center{text-align:center}
+.logo{width:76px;height:76px}
+h1{font-size:22px;margin:10px 0 4px}
+.sub{color:var(--mut);margin:0 0 18px;font-size:14px}
+label{display:block;text-align:right;color:var(--mut);font-size:13px;margin-bottom:12px}
+input{width:100%;margin-top:5px;padding:13px;border:1px solid var(--line);border-radius:10px;font-size:18px;font-family:inherit;text-align:center;letter-spacing:3px;direction:ltr}
+input:focus{outline:2px solid var(--teal-l);border-color:var(--teal)}
+button{font-family:inherit;font-size:16px;border-radius:10px;border:1px solid var(--line);background:#fff;padding:11px 16px;cursor:pointer}
+.primary{background:var(--teal);color:#fff;border-color:var(--teal);width:100%;padding:13px}
+.msg{color:var(--red);min-height:20px;margin:12px 0 0;font-size:14px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.bar img{width:38px;height:38px}
+.bar b{display:block;color:var(--teal)}
+.bar small{color:var(--mut)}
+.bar .sp{flex:1}
+.file{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.file .m{flex:1;min-width:0}
+.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file small{color:var(--mut)}
+.file button{padding:8px 14px;font-size:14px}
+.none{text-align:center;color:var(--mut);padding:50px 10px;background:#fff;border:1px dashed var(--line);border-radius:12px;font-size:17px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="login" class="card center hidden">
+    <img src="logo.svg" class="logo" alt="">
+    <h1 id="appName">Lab Link</h1>
+    <p class="sub">سجّل الدخول بالكود وكلمة السر اللي اتسلموا لك من المعمل</p>
+    <form id="loginForm">
+      <label>كود المريض<input name="code" inputmode="numeric" maxlength="6" autocomplete="username" required></label>
+      <label>كلمة السر<input name="password" inputmode="numeric" type="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit">دخول</button>
+    </form>
+    <p class="msg" id="msg"></p>
+  </div>
+
+  <div id="home" class="hidden">
+    <div class="bar">
+      <img src="logo.svg" alt="">
+      <div><b id="pname"></b><small id="pcode"></small></div>
+      <span class="sp"></span>
+      <button id="refresh" title="تحديث">↻</button>
+      <button id="logout">خروج</button>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://lab-results-api.YOUR-SUBDOMAIN.workers.dev'; // غيّره لرابط الـ Worker
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const set = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const del = (k) => { try { localStorage.removeItem(k); } catch {} };
+let token = get('p_token');
+
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  let res;
+  try { res = await fetch(API_URL + path, { ...opts, headers, body: opts.body && JSON.stringify(opts.body) }); }
+  catch { throw new Error('مفيش اتصال بالإنترنت'); }
+  if (res.status === 401 && token && !path.includes('/login')) { logout(); throw new Error('انتهت الجلسة'); }
+  if (!res.ok) { let m = 'حصل خطأ'; try { m = (await res.json()).error || m; } catch {} throw new Error(m); }
+  return res;
+}
+const fmtDate = (t) => new Date(t).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+
+function logout() { token = null; del('p_token'); $('#home').classList.add('hidden'); $('#login').classList.remove('hidden'); }
+
+async function load() {
+  $('#login').classList.add('hidden'); $('#home').classList.remove('hidden');
+  $('#list').innerHTML = '<div class="none">...</div>';
+  try {
+    const d = await (await api('/api/patient/results')).json();
+    $('#pname').textContent = d.name; $('#pcode').textContent = 'كود: ' + d.code;
+    $('#list').innerHTML = d.results.length ? d.results.map((r) =>
+      `<div class="file" data-id="${esc(r.id)}"><span style="font-size:24px">📄</span>
+        <div class="m"><b>${esc(r.name)}</b><small>${fmtDate(r.date)}</small></div>
+        <button data-v="${esc(r.id)}">فتح</button></div>`).join('')
+      : '<div class="none">لا توجد نتائج حتى الآن</div>';
+    $('#list').querySelectorAll('[data-v]').forEach((b) => b.onclick = () => openPdf(d.code, b.dataset.v, b));
+  } catch (e) { if (token) $('#list').innerHTML = `<div class="none">${esc(e.message)}</div>`; }
+}
+
+async function openPdf(code, id, btn) {
+  const old = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+  try {
+    const res = await api(`/api/files/${code}/${id}`);
+    const url = URL.createObjectURL(new Blob([await res.arrayBuffer()], { type: 'application/pdf' }));
+    const w = window.open(url, '_blank');
+    if (!w) { const a = document.createElement('a'); a.href = url; a.download = 'result.pdf'; a.click(); }
+  } catch (e) { alert(e.message); }
+  btn.textContent = old; btn.disabled = false;
+}
+
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#msg').textContent = '';
+  const f = Object.fromEntries(new FormData(e.target));
+  try {
+    const d = await (await api('/api/patient/login', { method: 'POST', body: f })).json();
+    token = d.token; set('p_token', token); e.target.reset(); load();
+  } catch (err) { $('#msg').textContent = err.message; }
+});
+$('#logout').onclick = logout;
+$('#refresh').onclick = load;
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (token) load(); else $('#login').classList.remove('hidden');
+</script>
+</body>
+</html>

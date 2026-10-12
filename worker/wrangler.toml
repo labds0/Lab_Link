@@ -1,0 +1,16 @@
+name = "lab-results-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# 1) npx wrangler kv namespace create DATA   -> الصق الـ id هنا
+[[kv_namespaces]]
+binding = "DATA"
+id = "PUT_KV_NAMESPACE_ID_HERE"
+
+# 2) npx wrangler r2 bucket create lab-results-files
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "lab-results-files"
+
+# 3) npx wrangler secret put SECRET          (أي نص عشوائي طويل)
+# 4) (اختياري) npx wrangler secret put REGISTER_KEY   (كود لازم المعمل يكتبه وقت التسجيل)
