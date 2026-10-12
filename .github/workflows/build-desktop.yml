@@ -5,6 +5,9 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -36,18 +39,12 @@ jobs:
             desktop/dist/*.blockmap
             desktop/dist/latest.yml
 
-      # عند الـ tag بس: نرفع التحديث على السيرفر، فالبرامج المثبتة تلاقيه وتتحدّث لوحدها
-      # لازم secrets: CLOUDFLARE_API_TOKEN و CLOUDFLARE_ACCOUNT_ID
-      - name: Publish update to Worker (R2)
+      # عند الـ tag بس: نرفع ملفات التحديث على GitHub Release، فالبرامج المثبتة تلاقيه وتتحدّث لوحدها
+      - name: Publish update to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        working-directory: worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          for f in ../desktop/dist/*.exe ../desktop/dist/*.blockmap; do
-            npx --yes wrangler r2 object put "lab-results-files/updates/$(basename "$f")" --file "$f" --remote
-          done
-          # latest.yml آخر حاجة، عشان ماحدش يشوف إصدار ملفه لسه ما اترفعش
-          npx --yes wrangler r2 object put "lab-results-files/updates/latest.yml" --file ../desktop/dist/latest.yml --remote
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/dist/*.exe
+            desktop/dist/*.blockmap
+            desktop/dist/latest.yml
