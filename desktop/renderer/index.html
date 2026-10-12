@@ -71,12 +71,23 @@
       </div>
       <ul id="patientList"></ul>
       <div id="dayPanel" class="daypanel">
-        <div class="daysum">
+        <button id="dayToggle" type="button" class="dayhead" title="فتح التقويم">
           <span class="dsi"><i data-i="calendar"></i></span>
-          <div class="dst"><b id="dayTitle"></b><small id="dayCount"></small></div>
-        </div>
-        <button id="dayToggle" type="button" class="btn block"><i data-i="calendar"></i><span id="dayToggleTxt">اختر اليوم</span><i data-i="chev" class="chev"></i></button>
+          <span class="dst"><small id="dayLbl"></small><b id="dayTitle"></b></span>
+          <span class="cnt" id="dayCount"></span>
+          <i data-i="chev" class="chev"></i>
+        </button>
         <div id="cal" class="cal hidden"></div>
+        <div id="dayChips" class="chips">
+          <button type="button" data-q="today">اليوم</button>
+          <button type="button" data-q="yest">أمس</button>
+          <button type="button" data-q="7">٧ أيام</button>
+          <button type="button" data-q="all">الكل</button>
+        </div>
+        <div class="range">
+          <label><span>من</span><input type="date" id="dFrom"></label>
+          <label><span>إلى</span><input type="date" id="dTo"></label>
+        </div>
       </div>
     </aside>
     <main id="results" class="results"></main>
@@ -84,7 +95,7 @@
 </section>
 
 <div id="updBar" class="updbar hidden"></div>
-<div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
+<div id="modal" class="modal hidden"><div class="modal-box"><button type="button" class="modal-x" id="modalX" title="إغلاق (Esc)" aria-label="إغلاق"></button><div class="modal-card" id="modalCard"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 <div id="printArea"></div>
 <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>

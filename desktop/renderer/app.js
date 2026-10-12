@@ -34,6 +34,7 @@ const ICONS = {
   chev: '<path d="M6 9l6 6 6-6"/>',
   chevR: '<path d="M9 18l6-6-6-6"/>',
   chevL: '<path d="M15 18l-6-6 6-6"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -106,6 +107,9 @@ function closeModal() {
   if (viewUrl) { URL.revokeObjectURL(viewUrl); viewUrl = null; }
 }
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
+$('#modalX').innerHTML = ic('x');
+$('#modalX').onclick = closeModal;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#modal').classList.contains('hidden')) closeModal(); });
 const fmtDate = (t) => new Date(t).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
 const fmtSize = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
 async function copyText(t) {
@@ -375,27 +379,39 @@ const pad2 = (n) => String(n).padStart(2, '0');
 const dkey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const todayKey = () => dkey(new Date());
 const keyDate = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (k, n) => { const d = keyDate(k); d.setDate(d.getDate() + n); return dkey(d); };
 const nfAr = new Intl.NumberFormat('ar-EG');
-const fmtDay = (k) => keyDate(k).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const fmtShortDay = (k) => keyDate(k).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDay = (k) => { const d = keyDate(k); const o = { weekday: 'long', day: 'numeric', month: 'long' }; if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric'; return d.toLocaleDateString('ar-EG', o); };
+const fmtShortDay = (k) => { const d = keyDate(k); const o = { day: 'numeric', month: 'short' }; if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric'; return d.toLocaleDateString('ar-EG', o); };
+const countText = (n) => (n === 0 ? 'لا مرضى' : n === 1 ? 'مريض واحد' : n === 2 ? 'مريضان' : n <= 10 ? `${nfAr.format(n)} مرضى` : `${nfAr.format(n)} مريضًا`);
 // auto = بيتابع "النهاردة" (حتى لو البرنامج فضل مفتوح بعد منتصف الليل)
 let flt = { auto: true, all: false, from: '', to: '' };
-let calMode = 'day', calOpen = false, calView = new Date(), pendingFrom = null, lastDay = todayKey();
+let calOpen = false, calView = new Date(), lastDay = todayKey();
 const fltRange = () => (flt.auto ? { from: todayKey(), to: todayKey() } : flt);
 const inFilter = (p) => { if (flt.all) return true; const k = dkey(new Date(p.created)); const r = fltRange(); return k >= r.from && k <= r.to; };
-function setToday() { flt = { auto: true, all: false, from: '', to: '' }; pendingFrom = null; calView = new Date(); }
+function setToday() { flt = { auto: true, all: false, from: '', to: '' }; calView = new Date(); }
+function setRange(from, to) {
+  if (from > to) [from, to] = [to, from];
+  if (from === todayKey() && to === todayKey()) return setToday();
+  flt = { auto: false, all: false, from, to };
+}
 
 function renderDay() {
-  const r = fltRange();
+  const r = fltRange(), t = todayKey(), y = addDays(t, -1);
   const n = patients.filter(inFilter).length;
-  const t = todayKey();
-  $('#dayTitle').textContent = flt.all ? 'كل المرضى'
-    : r.from === r.to ? (r.from === t ? 'اليوم • ' : '') + fmtDay(r.from)
-    : `من ${fmtShortDay(r.from)} إلى ${fmtShortDay(r.to)}`;
-  $('#dayCount').textContent = n ? `${nfAr.format(n)} مريض` : 'لا يوجد مرضى';
-  $('#dayToggleTxt').textContent = calOpen ? 'إغلاق التقويم' : (r.from !== r.to || flt.all) ? 'تغيير الفترة' : 'اختر اليوم';
+  let lbl, title;
+  if (flt.all) { lbl = 'كل الأيام'; title = 'كل المرضى'; }
+  else if (r.from === r.to) { lbl = r.from === t ? 'اليوم' : r.from === y ? 'أمس' : 'يوم محدد'; title = fmtDay(r.from); }
+  else { lbl = 'الفترة'; title = `${fmtShortDay(r.from)} – ${fmtShortDay(r.to)}`; }
+  $('#dayLbl').textContent = lbl;
+  $('#dayTitle').textContent = title;
+  $('#dayCount').textContent = countText(n);
   $('#dayToggle').classList.toggle('open', calOpen);
   $('#cal').classList.toggle('hidden', !calOpen);
+  const act = flt.all ? 'all' : r.from === t && r.to === t ? 'today' : r.from === y && r.to === y ? 'yest' : r.to === t && r.from === addDays(t, -6) ? '7' : '';
+  document.querySelectorAll('#dayChips [data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === act));
+  $('#dFrom').value = flt.all ? '' : r.from;
+  $('#dTo').value = flt.all ? '' : r.to;
   if (calOpen) renderCal();
 }
 function renderCal() {
@@ -405,39 +421,49 @@ function renderCal() {
   const offset = (new Date(y, m, 1).getDay() + 1) % 7; // الأسبوع بيبدأ السبت
   const total = new Date(y, m + 1, 0).getDate();
   const r = fltRange(), t = todayKey();
-  const from = pendingFrom || (flt.all ? '' : r.from), to = pendingFrom ? pendingFrom : (flt.all ? '' : r.to);
+  const from = flt.all ? '' : r.from, to = flt.all ? '' : r.to;
   let cells = '';
   for (let i = 0; i < offset; i++) cells += '<span></span>';
   for (let d = 1; d <= total; d++) {
     const k = `${y}-${pad2(m + 1)}-${pad2(d)}`;
     const cls = ['d', k === t ? 'today' : '', counts[k] ? 'has' : '', k === from || k === to ? 'sel' : from && k > from && k < to ? 'rng' : ''].join(' ');
-    cells += `<button type="button" class="${cls}" data-k="${k}" title="${counts[k] ? nfAr.format(counts[k]) + ' مريض' : ''}">${nfAr.format(d)}</button>`;
+    cells += `<button type="button" class="${cls}" data-k="${k}" title="${counts[k] ? countText(counts[k]) : ''}">${nfAr.format(d)}</button>`;
   }
-  const hint = calMode === 'range' ? (pendingFrom ? `من ${fmtShortDay(pendingFrom)} — اختر يوم النهاية` : 'اختر يوم البداية ثم يوم النهاية') : 'اضغط على اليوم لعرض مرضاه';
   $('#cal').innerHTML = `<div class="cal-head">
       <button type="button" class="cal-nav" data-nav="-1" title="الشهر السابق">${ic('chevR')}</button>
       <b>${calView.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}</b>
       <button type="button" class="cal-nav" data-nav="1" title="الشهر التالي">${ic('chevL')}</button></div>
-    <div class="cal-grid">${['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'].map((x) => `<span class="dn">${x}</span>`).join('')}${cells}</div>
-    <div class="cal-seg"><button type="button" data-mode="day" class="${calMode === 'day' ? 'on' : ''}">يوم واحد</button><button type="button" data-mode="range" class="${calMode === 'range' ? 'on' : ''}">من — إلى</button></div>
-    <div class="cal-hint">${hint}</div>
-    <div class="cal-quick"><button type="button" class="btn sm" data-q="today">اليوم</button><button type="button" class="btn sm" data-q="all">كل المرضى</button></div>`;
+    <div class="cal-grid">${['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'].map((x) => `<span class="dn">${x}</span>`).join('')}${cells}</div>`;
 }
-$('#dayToggle').onclick = () => { calOpen = !calOpen; pendingFrom = null; renderDay(); };
+$('#dayToggle').onclick = () => {
+  calOpen = !calOpen;
+  if (calOpen) calView = flt.all ? new Date() : keyDate(fltRange().to);
+  renderDay();
+};
 $('#cal').addEventListener('click', (e) => {
-  const nav = e.target.closest('[data-nav]'), mode = e.target.closest('[data-mode]'), q = e.target.closest('[data-q]'), day = e.target.closest('[data-k]');
+  const nav = e.target.closest('[data-nav]'), day = e.target.closest('[data-k]');
   if (nav) { calView = new Date(calView.getFullYear(), calView.getMonth() + Number(nav.dataset.nav), 1); renderCal(); }
-  else if (mode) { calMode = mode.dataset.mode; pendingFrom = null; renderCal(); }
-  else if (q) { if (q.dataset.q === 'today') setToday(); else { flt = { auto: false, all: true, from: '', to: '' }; pendingFrom = null; } calOpen = false; renderPatients(); }
-  else if (day) {
-    const k = day.dataset.k;
-    if (calMode === 'range' && !pendingFrom) { pendingFrom = k; renderCal(); return; }
-    if (calMode === 'range') { flt = { auto: false, all: false, from: k < pendingFrom ? k : pendingFrom, to: k < pendingFrom ? pendingFrom : k }; pendingFrom = null; }
-    else if (k === todayKey()) setToday();
-    else flt = { auto: false, all: false, from: k, to: k };
-    calOpen = false; renderPatients();
-  }
+  else if (day) { setRange(day.dataset.k, day.dataset.k); calOpen = false; renderPatients(); }
 });
+$('#dayChips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-q]');
+  if (!b) return;
+  const t = todayKey(), q = b.dataset.q;
+  if (q === 'today') setToday();
+  else if (q === 'yest') setRange(addDays(t, -1), addDays(t, -1));
+  else if (q === '7') setRange(addDays(t, -6), t);
+  else flt = { auto: false, all: true, from: '', to: '' };
+  calOpen = false;
+  renderPatients();
+});
+function onRangeInput() {
+  const f = $('#dFrom').value, t = $('#dTo').value;
+  if (!f && !t) return;
+  setRange(f || t, t || f);
+  renderPatients();
+}
+$('#dFrom').addEventListener('change', onRangeInput);
+$('#dTo').addEventListener('change', onRangeInput);
 setInterval(() => { if (flt.auto && lastDay !== todayKey()) { lastDay = todayKey(); renderPatients(); } }, 60000);
 
 function renderPatients() {
