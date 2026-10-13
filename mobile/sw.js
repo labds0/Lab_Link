@@ -1,5 +1,5 @@
 // كاش بسيط للواجهة فقط (النتائج دايمًا بتتحمل من السيرفر ومش بتتخزن)
-const CACHE = 'results-shell-v3';
+const CACHE = 'results-shell-v4';
 const SHELL = ['./', './index.html', './logo.svg', './manifest.json', './icon-192.png', './apple-touch-icon.png'];
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL))));
 self.addEventListener('activate', (e) =>

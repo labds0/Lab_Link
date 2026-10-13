@@ -36,6 +36,9 @@ const ICONS = {
   chevL: '<path d="M15 18l-6-6 6-6"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 function hydrateIcons(root = document) { root.querySelectorAll('[data-i]').forEach((el) => { el.innerHTML = ic(el.dataset.i); el.removeAttribute('data-i'); }); }
@@ -72,7 +75,9 @@ async function api(path, opts = {}) {
   try {
     res = await fetch(API + path, { ...opts, headers, body });
   } catch {
-    throw new Error('مفيش اتصال بالإنترنت أو السيرفر');
+    const e = new Error('مفيش اتصال بالإنترنت أو السيرفر');
+    e.network = true;
+    throw e;
   }
   if (res.status === 401 && token && !path.includes('/login')) {
     logout();
@@ -181,7 +186,7 @@ function showMain() {
   $('#auth').classList.add('hidden');
   $('#main').classList.remove('hidden');
   renderHeader();
-  loadPatients();
+  loadPatients().then(() => autoProcess());
 }
 function renderHeader() {
   $('#appName').textContent = lab.labName || APP_NAME;
@@ -299,6 +304,15 @@ async function openSettings() {
     </div>` : ''}
 
     <div class="sec">
+      <h4>الرفع التلقائي من فولدر</h4>
+      <p class="hint">اختار فولدر على الجهاز ده، وأي ملف PDF بيتحط فيه بيترفع لوحده لمريضه. اسم الملف لازم يبدأ بكود المريض، مثال: <b dir="ltr">604913 - CBC.pdf</b>. الملفات اللي اترفعت بتتنقل لفولدر فرعي اسمه <b dir="ltr">_uploaded</b> جوه نفس الفولدر.</p>
+      <div class="folder-row"><div class="folder-path" id="afPath" dir="auto">${esc(AUTO.cfg.dir || 'لسه ما اخترتش فولدر')}</div><button type="button" class="btn sm" id="afPick">${ic('folder')}اختيار فولدر</button></div>
+      <label class="chk"><input type="checkbox" id="afOn" ${AUTO.cfg.enabled ? 'checked' : ''}>تشغيل الرفع التلقائي</label>
+      <label class="chk"><input type="checkbox" id="afName" ${AUTO.cfg.byName ? 'checked' : ''}>مطابقة الملفات اللي مفيهاش كود بالاسم (لمرضى آخر ${LU.NAME_WINDOW_DAYS} أيام بس)</label>
+      <p class="hint">المطابقة بالاسم أقل أمانًا من الكود. لو فيه مريضين بنفس الاسم البرنامج مش بيرفع ويسألك. الكود هو الأضمن.</p>
+    </div>
+
+    <div class="sec">
       <h4>عن البرنامج</h4>
       <div class="serial-box"><span>رقم الجهاز</span><b>${esc(SERIAL)}</b><button class="btn sm" id="copySerial2">${ic('copy')}نسخ</button></div>
       <p class="hint">الإصدار ${esc(CFG.version)}</p>
@@ -319,6 +333,7 @@ async function openSettings() {
     } catch (err) { toast(err.message); }
   };
   if (!isAdmin) return;
+  bindAutoSettings();
   let pendingLogo; // undefined = من غير تغيير، '' = إزالة، data URL = لوجو جديد
   const showLogo = (src) => { $('#logoPrev').src = src || 'logo.svg'; $('#logoRemove').classList.toggle('hidden', !src); };
   const logoInput = document.createElement('input');
@@ -485,29 +500,59 @@ $('#patientList').addEventListener('click', (e) => {
   if (p) selectPatient(p);
 });
 
-/* ---------- WhatsApp ---------- */
-// الرقم بيتخزن على الجهاز ده بس (مش على السيرفر)
+/* ---------- إرسال رابط النتيجة للمريض (واتساب / SMS) ---------- */
+const LU = window.LabUtil;
+// رقم التليفون بيتخزن على الجهاز ده بس (مش على السيرفر)
 const getPhone = (code) => (store.get('phones') || {})[code] || '';
 const savePhone = (code, ph) => store.set('phones', { ...(store.get('phones') || {}), [code]: ph });
-function waNumber(raw) {
-  let n = String(raw).replace(/\D/g, '');
-  if (n.startsWith('00')) n = n.slice(2);
-  else if (n.startsWith('0')) n = '20' + n.slice(1); // مصر
-  return n.length >= 10 ? n : '';
-}
-function waMessage(d) {
+
+// كل مرة بنطلّع رابط جديد موقّع للمريض: بيفتح بيه نتايجه من غير كود ولا كلمة سر (صالح 14 يوم)
+async function makeShareUrl(code) {
   const base = (CFG.MOBILE_URL || '').trim();
-  const lines = [`أهلًا ${d.name}، نتيجتك جاهزة من ${lab.labName || APP_NAME} 🧪`];
-  if (base) lines.push(`افتح الرابط: ${base}${base.includes('#') ? '' : '#'}c=${d.code}&p=${d.password}`);
-  lines.push(`${base ? 'أو ادخل يدوي: ' : ''}الكود ${d.code} / كلمة السر ${d.password}`);
-  return lines.join('\n');
+  if (!base) throw new Error('رابط نسخة المريض (MOBILE_URL) مش مضبوط في app-config.json');
+  const { token: t } = await (await api(`/api/lab/patients/${code}/link`, { method: 'POST' })).json();
+  return `${base}${base.includes('#') ? '' : '#'}t=${t}`;
 }
-function openWhatsApp(d, phone) {
-  const n = waNumber(phone);
-  if (!n) { toast('اكتب رقم صحيح'); return false; }
-  savePhone(d.code, phone);
-  window.open(`https://wa.me/${n}?text=${encodeURIComponent(waMessage(d))}`, '_blank');
-  return true;
+async function openLink(url) {
+  if (D.openExternal) await D.openExternal(url); else window.open(url, '_blank');
+}
+// via: 'wa' | 'sms' | 'copy'
+async function shareVia(via, patient, phone, btn) {
+  if (via !== 'copy' && !LU.normalizePhone(phone)) { toast('اكتب رقم تليفون صحيح'); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const url = await makeShareUrl(patient.code);
+    const text = LU.shareMessage({ name: patient.name, labName: lab.labName || APP_NAME, url });
+    if (phone) savePhone(patient.code, phone);
+    if (via === 'copy') await copyText(text);
+    else await openLink(via === 'wa' ? LU.waUrl(phone, text) : LU.smsUrl(phone, text));
+  } catch (err) { toast(err.message); }
+  finally { if (btn) btn.disabled = false; }
+}
+
+function openShare(p) {
+  openModal(`<h3>إرسال النتيجة لـ ${esc(p.name)}</h3>
+    <p class="hint">المريض بيفتح الرابط ويشوف نتايجه على طول من غير كود ولا كلمة سر. الرابط شخصي وصالح 14 يوم.</p>
+    <label class="wa-row">رقم تليفون المريض<input id="shPhone" inputmode="tel" dir="ltr" placeholder="01012345678" value="${esc(getPhone(p.code))}"></label>
+    <div class="modal-actions">
+      <button class="btn primary" id="shWa">${ic('chat')}واتساب</button>
+      <button class="btn" id="shSms">${ic('send')}SMS</button>
+      <button class="btn" id="shCopy">${ic('copy')}نسخ الرسالة</button>
+    </div>
+    <p class="hint">واتساب بيفتح المحادثة والرسالة جاهزة وإنت بتدوس إرسال. SMS بيفتح تطبيق Phone Link لو متثبّت على الجهاز، ولو لأ استخدم "نسخ الرسالة".</p>
+    <div class="sec soft"><span class="hint">بعت الرابط للشخص الغلط؟</span>
+      <button class="btn sm danger" id="shRevoke">${ic('trash')}إلغاء كل الروابط السابقة</button></div>
+    <div class="modal-actions"><button class="btn ghost" id="shClose">إغلاق</button></div>`);
+  const ph = () => $('#shPhone').value;
+  $('#shWa').onclick = (e) => shareVia('wa', p, ph(), e.currentTarget);
+  $('#shSms').onclick = (e) => shareVia('sms', p, ph(), e.currentTarget);
+  $('#shCopy').onclick = (e) => shareVia('copy', p, ph(), e.currentTarget);
+  $('#shRevoke').onclick = async () => {
+    if (!confirm('إلغاء كل الروابط اللي اتبعتت للمريض ده؟ لو كان فاتح نتايجه على موبايله هيتطلب منه دخول من جديد.')) return;
+    try { await api(`/api/lab/patients/${p.code}/link`, { method: 'DELETE' }); toast('اتلغت كل الروابط السابقة'); }
+    catch (err) { toast(err.message); }
+  };
+  $('#shClose').onclick = closeModal;
 }
 
 function credsHtml(d, title) {
@@ -515,12 +560,13 @@ function credsHtml(d, title) {
     <div class="cred">
       <div><span>الاسم</span><b style="font-size:17px;letter-spacing:0">${esc(d.name)}</b></div>
       <div><span>كود المريض</span><b>${esc(d.code)}</b></div>
-      <div><span>كلمة السر</span><b>${esc(d.password)}</b></div>
+      <div><span>كلمة السر</span><b>${esc(LU.fmtPw(d.password))}</b></div>
     </div>
-    <p class="hint">كلمة السر بتظهر مرة واحدة بس. اطبعها أو سلّمها للمريض دلوقتي. لو ضاعت تقدر تعمل كلمة سر جديدة.</p>
-    <label class="wa-row">رقم واتساب المريض<input id="waPhone" inputmode="tel" dir="ltr" placeholder="01012345678" value="${esc(getPhone(d.code))}"></label>
+    <p class="hint">كلمة السر بتظهر مرة واحدة بس، اطبعها أو سلّمها للمريض دلوقتي. أو ابعتله رابط دخول مباشر، يفتح بيه نتايجه من غير ما يكتب كود ولا كلمة سر.</p>
+    <label class="wa-row">رقم تليفون المريض (للإرسال)<input id="waPhone" inputmode="tel" dir="ltr" placeholder="01012345678" value="${esc(getPhone(d.code))}"></label>
     <div class="modal-actions">
-      <button class="btn primary" id="waCred">${ic('chat')}إرسال واتساب</button>
+      <button class="btn primary" id="waCred">${ic('chat')}واتساب</button>
+      <button class="btn" id="smsCred">${ic('send')}SMS</button>
       <button class="btn" id="printCred">${ic('print')}طباعة</button>
       <button class="btn" id="copyCred">${ic('copy')}نسخ</button>
       <button class="btn ghost" id="closeCred">إغلاق</button>
@@ -529,13 +575,12 @@ function credsHtml(d, title) {
 function bindCreds(d) {
   $('#printCred').onclick = () => {
     $('#printArea').innerHTML = `<img src="${esc(lab.logo || 'logo.svg')}" alt=""><h2>${esc(lab.labName || APP_NAME)}</h2><p>فرع ${esc(lab.branch)}</p><p>${esc(d.name)}</p>
-      <p>كود المريض</p><div class="big">${esc(d.code)}</div><p>كلمة السر</p><div class="big">${esc(d.password)}</div>`;
+      <p>كود المريض</p><div class="big">${esc(d.code)}</div><p>كلمة السر</p><div class="big">${esc(LU.fmtPw(d.password))}</div>`;
     window.print();
   };
-  $('#copyCred').onclick = async () => {
-    try { await navigator.clipboard.writeText(`الاسم: ${d.name}\nالكود: ${d.code}\nكلمة السر: ${d.password}`); toast('تم النسخ'); } catch { toast('تعذر النسخ'); }
-  };
-  $('#waCred').onclick = () => openWhatsApp(d, $('#waPhone').value);
+  $('#copyCred').onclick = () => copyText(`الاسم: ${d.name}\nالكود: ${d.code}\nكلمة السر: ${LU.fmtPw(d.password)}`);
+  $('#waCred').onclick = (e) => shareVia('wa', d, $('#waPhone').value, e.currentTarget);
+  $('#smsCred').onclick = (e) => shareVia('sms', d, $('#waPhone').value, e.currentTarget);
   $('#closeCred').onclick = closeModal;
 }
 
@@ -553,6 +598,7 @@ $('#newPatientBtn').onclick = () => {
       bindCreds(d);
       setToday();
       await loadPatients();
+      autoRetryHeld();
       selectPatient({ code: d.code, name: d.name });
     } catch (err) { toast(err.message); }
   };
@@ -576,6 +622,7 @@ function renderResults(results) {
       <div class="who">${avatar(p.name)}<div><h2>${esc(p.name)}</h2><span class="chip">كود المريض <b>${esc(p.code)}</b></span></div></div>
       <div class="actions">
         <button class="btn primary" id="attachBtn">${ic('upload')}إرفاق نتيجة PDF</button>
+        <button class="btn" id="shareBtn">${ic('chat')}إرسال الرابط</button>
         <button class="btn" id="resetBtn">${ic('key')}كلمة سر جديدة</button>
         <button class="btn danger" id="delPatientBtn">${ic('trash')}حذف المريض</button>
       </div></div>`;
@@ -591,6 +638,7 @@ function renderResults(results) {
   $('#results').innerHTML = head + (results.length ? `<h3 class="sectitle">النتائج (${results.length})</h3>` : '') + body;
 
   $('#attachBtn').onclick = pickFiles;
+  $('#shareBtn').onclick = () => openShare(p);
   if ($('#attachBtn2')) $('#attachBtn2').onclick = pickFiles;
   $('#resetBtn').onclick = async () => {
     if (!confirm('عمل كلمة سر جديدة للمريض؟ الكلمة القديمة هتتلغي.')) return;
@@ -692,9 +740,147 @@ function setupUpdates() {
   };
 }
 
+/* ---------- رفع تلقائي من فولدر ---------- */
+// queue = ملفات في الانتظار، held = ملفات محتاجة قرار من المعمل (مفيش مريض مطابق، أو السيرفر رفضها)
+const AUTO = { cfg: { dir: '', enabled: false, byName: false }, queue: new Map(), held: new Map(), busy: false, uploaded: 0 };
+
+function updateAutoBtn() {
+  const b = $('#autoBtn');
+  if (!b) return;
+  const held = AUTO.held.size;
+  b.classList.toggle('hidden', !(AUTO.cfg.enabled || held || AUTO.queue.size));
+  b.classList.toggle('attn', held > 0);
+  const c = $('#autoCnt');
+  c.textContent = nfAr.format(held);
+  c.classList.toggle('hidden', !held);
+}
+function hold(it, reason) {
+  AUTO.queue.delete(it.id);
+  AUTO.held.set(it.id, { id: it.id, name: it.name, reason });
+}
+function addPending(f) {
+  if (AUTO.queue.has(f.id) || AUTO.held.has(f.id)) return;
+  AUTO.queue.set(f.id, { id: f.id, name: f.name, size: f.size, tries: 0 });
+  updateAutoBtn();
+  autoProcess();
+}
+async function refreshPatientsQuiet() {
+  try { patients = (await (await api('/api/lab/patients')).json()).patients; renderPatients(); return true; }
+  catch (e) { return false; }
+}
+// قراءة الملف من الفولدر ورفعه لمريض، وبعدها نقله لـ _uploaded
+async function uploadPending(it, patient) {
+  const bytes = await D.folder.read(it.id);
+  const fd = new FormData();
+  fd.append('file', new Blob([bytes], { type: 'application/pdf' }), it.name);
+  fd.append('name', it.name);
+  await api(`/api/lab/patients/${patient.code}/results`, { method: 'POST', body: fd });
+  try { await D.folder.done(it.id); } catch { /* اترفع فعلًا، النقل بس هو اللي فشل */ }
+  AUTO.queue.delete(it.id); AUTO.held.delete(it.id);
+  AUTO.uploaded++;
+  if (selected?.code === patient.code) selectPatient(selected);
+}
+async function autoProcess() {
+  if (AUTO.busy || !token || !lab || !AUTO.queue.size) return;
+  AUTO.busy = true;
+  try {
+    if (!(await refreshPatientsQuiet())) return; // مفيش اتصال: هنحاول تاني بعد دقيقة
+    for (const it of [...AUTO.queue.values()]) {
+      if (!token) break;
+      const m = LU.matchFile(it.name, patients, { byName: AUTO.cfg.byName });
+      if (!m.patient) { hold(it, m.reason); continue; }
+      try {
+        await uploadPending(it, m.patient);
+        toast(`اترفع "${it.name}" لـ ${m.patient.name}`);
+      } catch (err) {
+        if (!token) break;
+        if (err.network) { it.tries++; if (it.tries >= 5) hold(it, 'فشل الرفع: ' + err.message); break; }
+        hold(it, err.message);
+      }
+    }
+  } finally { AUTO.busy = false; updateAutoBtn(); }
+}
+function autoRetryHeld() {
+  for (const h of [...AUTO.held.values()]) { AUTO.held.delete(h.id); AUTO.queue.set(h.id, { id: h.id, name: h.name, tries: 0 }); }
+  updateAutoBtn();
+  autoProcess();
+}
+function pickPatient(v) {
+  v = String(v || '').trim();
+  const m = v.match(/(\d{4,6})\s*$/);
+  if (m) { const p = patients.find((x) => x.code === m[1]); if (p) return p; }
+  const lc = v.toLowerCase();
+  return patients.find((x) => x.name.toLowerCase() === lc) || null;
+}
+function openAuto() {
+  const held = [...AUTO.held.values()];
+  const opts = patients.slice().sort((a, b) => b.created - a.created).map((p) => `<option value="${esc(p.name)} — ${esc(p.code)}"></option>`).join('');
+  openModal(`<h3>الرفع التلقائي من فولدر</h3>
+    <div class="auto-st ${AUTO.cfg.enabled ? 'on' : 'off'}"><span class="dot"></span><b>${AUTO.cfg.enabled ? 'شغّال' : 'متوقف'}</b><span class="path" dir="ltr">${esc(AUTO.cfg.dir || '')}</span></div>
+    <p class="hint">في الانتظار: ${nfAr.format(AUTO.queue.size)} • اترفع من ساعة ما فتحت البرنامج: ${nfAr.format(AUTO.uploaded)}${AUTO.cfg.dir ? '' : ' • اختار الفولدر من الإعدادات'}</p>
+    ${held.length
+      ? `<h3 class="sectitle">ملفات محتاجة قرارك (${nfAr.format(held.length)})</h3>
+        ${held.map((h) => `<div class="held" data-id="${esc(h.id)}">
+          <div class="hm"><b dir="auto">${esc(h.name)}</b><small>${esc(h.reason)}</small></div>
+          <input class="hp" list="auPat" placeholder="اكتب اسم المريض أو كوده" dir="auto">
+          <button class="btn sm primary" data-a="up">رفع</button><button class="btn sm" data-a="skip">تجاهل</button></div>`).join('')}
+        <datalist id="auPat">${opts}</datalist>
+        <div class="modal-actions"><button class="btn sm" id="auRetry">${ic('refresh')}إعادة المطابقة</button></div>`
+      : '<p class="hint">مفيش ملفات معلّقة.</p>'}
+    <div class="modal-actions"><button class="btn" id="auClose">إغلاق</button></div>`, 'settings');
+  $('#auClose').onclick = closeModal;
+  if ($('#auRetry')) $('#auRetry').onclick = () => { autoRetryHeld(); closeModal(); };
+  $('#modalCard').querySelectorAll('.held').forEach((row) => {
+    const id = row.dataset.id;
+    row.querySelector('[data-a=up]').onclick = async (e) => {
+      const p = pickPatient(row.querySelector('.hp').value);
+      if (!p) { toast('اختار مريض من القايمة'); return; }
+      const it = AUTO.held.get(id);
+      e.currentTarget.disabled = true;
+      try { await uploadPending(it, p); toast(`اترفع "${it.name}" لـ ${p.name}`); }
+      catch (err) { toast(err.message); }
+      updateAutoBtn(); openAuto();
+    };
+    row.querySelector('[data-a=skip]').onclick = async () => {
+      try { await D.folder.skip(id); } catch (err) { toast(err.message); return; }
+      AUTO.held.delete(id); updateAutoBtn(); openAuto();
+    };
+  });
+}
+function bindAutoSettings() {
+  const sync = async (fn) => {
+    try { const st = await fn(); AUTO.cfg = { dir: st.dir, enabled: st.enabled, byName: st.byName }; }
+    catch (err) { toast(err.message); }
+    $('#afPath').textContent = AUTO.cfg.dir || 'لسه ما اخترتش فولدر';
+    $('#afOn').checked = AUTO.cfg.enabled; $('#afName').checked = AUTO.cfg.byName;
+    updateAutoBtn();
+  };
+  $('#afPick').onclick = () => sync(() => D.folder.choose());
+  const save = () => {
+    if ($('#afOn').checked && !AUTO.cfg.dir) { $('#afOn').checked = false; toast('اختار الفولدر الأول'); return; }
+    sync(() => D.folder.set({ enabled: $('#afOn').checked, byName: $('#afName').checked }));
+  };
+  $('#afOn').onchange = save; $('#afName').onchange = save;
+}
+async function autoInit() {
+  if (!D.folder) return;
+  $('#autoBtn').onclick = openAuto;
+  try {
+    const st = await D.folder.get();
+    AUTO.cfg = { dir: st.dir, enabled: st.enabled, byName: st.byName };
+    st.pending.forEach(addPending);
+  } catch { /* ممكن الواجهة تشتغل من غير فولدر */ }
+  D.folder.onFound(addPending);
+  D.folder.onGone(({ id }) => { AUTO.queue.delete(id); AUTO.held.delete(id); updateAutoBtn(); });
+  D.folder.onError((m) => toast(m));
+  setInterval(autoProcess, 60000);
+  updateAutoBtn();
+}
+
 /* ---------- start ---------- */
 hydrateIcons();
 syncThemeBtns();
 showEmpty();
 setupUpdates();
+autoInit();
 if (token && lab) showMain(); else checkDevice();

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, nativeTheme } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, nativeTheme, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -7,6 +7,7 @@ const { execFileSync } = require('child_process');
 const config = require('./app-config.json');
 
 const { parseHardware, serialFromParts, resolveSerial, readWindowsHardware } = require('./serial');
+const { createWatcher } = require('./folderwatch');
 
 // سيريال الجهاز مربوط بالهاردوير (اللوحة الأم + هارد النظام)، مش بالويندوز ولا الإنترنت.
 let SERIAL = '';
@@ -63,6 +64,45 @@ function setupUpdater() {
   });
 }
 
+/* ---------- الرفع التلقائي من فولدر ---------- */
+let auto = { dir: '', enabled: false, byName: false };
+const autoFile = () => path.join(app.getPath('userData'), 'auto-folder.json');
+function loadAuto() { try { auto = { ...auto, ...JSON.parse(fs.readFileSync(autoFile(), 'utf8')) }; } catch {} }
+function saveAuto() { try { fs.writeFileSync(autoFile(), JSON.stringify(auto)); } catch {} }
+const watcher = createWatcher({ onFound: (f) => send('folder:found', f), onGone: (f) => send('folder:gone', f) });
+function applyAuto() {
+  if (auto.enabled && auto.dir) {
+    if (!watcher.start(auto.dir)) send('folder:error', 'الفولدر ده مش موجود أو مش متاح دلوقتي');
+  } else watcher.stop();
+}
+const autoState = () => ({ ...auto, pending: watcher.list() });
+ipcMain.handle('folder:get', () => autoState());
+ipcMain.handle('folder:choose', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'اختار فولدر نتايج التحاليل', properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return autoState();
+  auto.dir = r.filePaths[0];
+  saveAuto();
+  applyAuto();
+  return autoState();
+});
+ipcMain.handle('folder:set', (_e, o) => {
+  const was = auto.enabled;
+  auto.enabled = !!(o && o.enabled);
+  auto.byName = !!(o && o.byName);
+  saveAuto();
+  if (was !== auto.enabled) applyAuto();
+  return autoState();
+});
+ipcMain.handle('folder:read', (_e, id) => watcher.read(String(id)));
+ipcMain.handle('folder:done', async (_e, id) => { await watcher.done(String(id)); return true; });
+ipcMain.handle('folder:skip', async (_e, id) => { await watcher.skip(String(id)); return true; });
+// روابط واتساب وSMS بس، مفيش أي رابط تاني بيتفتح من الواجهة
+ipcMain.handle('open:external', async (_e, url) => {
+  if (!/^(https:\/\/wa\.me\/\d{8,15}\?text=|sms:\+\d{8,15}\?body=)/.test(String(url))) throw new Error('رابط غير مسموح');
+  await shell.openExternal(String(url));
+  return true;
+});
+
 ipcMain.on('config', (e) => {
   e.returnValue = { ...config, serial: SERIAL, version: app.getVersion(), packaged: app.isPackaged };
 });
@@ -108,6 +148,6 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
-  app.whenReady().then(() => { SERIAL = computeSerial(); setupUpdater(); createWindow(); });
-  app.on('window-all-closed', () => app.quit());
+  app.whenReady().then(() => { SERIAL = computeSerial(); loadAuto(); setupUpdater(); createWindow(); applyAuto(); });
+  app.on('window-all-closed', () => { watcher.stop(); app.quit(); });
 }

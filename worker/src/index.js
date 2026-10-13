@@ -6,7 +6,9 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 const MAX_PDF = 20 * 1024 * 1024; // 20MB
 const TOKEN_TTL = 30 * 24 * 3600; // 30 يوم
+const LINK_TTL = 14 * 24 * 3600; // صلاحية رابط الدخول المباشر للمريض: 14 يوم
 const MAX_FAILS = 5; // محاولات فاشلة قبل القفل 15 دقيقة
+const MAX_IP_FAILS = 20; // حد المحاولات الفاشلة لكل IP على دخول المرضى (بيحمي حصة الكتابة كمان)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -76,13 +78,20 @@ function randomDigits(n) {
   const a = crypto.getRandomValues(new Uint32Array(n));
   return Array.from(a, (x) => x % 10).join('');
 }
+// كلمة سر المريض: 8 خانات من 32 رمز (من غير O/I/0/1 عشان ما يتلخبطوش) = 40 بت
+const PW_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomPassword(n = 8) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(n)), (x) => PW_CHARS[x % 32]).join('');
+}
+// الدخول مش حساس لحالة الحروف ولا للشرطات والمسافات (والكلمات القديمة الرقمية بتفضل شغالة)
+const normPw = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 function randomCode() {
   // كود المريض: 6 أرقام ومش بيبدأ بصفر
   return String(1 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9)) + randomDigits(5);
 }
 
 /* ---------- rate limit ---------- */
-const isLocked = async (env, k) => parseInt((await env.DATA.get('fail:' + k)) || '0', 10) >= MAX_FAILS;
+const isLocked = async (env, k, max = MAX_FAILS) => parseInt((await env.DATA.get('fail:' + k)) || '0', 10) >= max;
 const addFail = async (env, k) => {
   const n = parseInt((await env.DATA.get('fail:' + k)) || '0', 10) + 1;
   await env.DATA.put('fail:' + k, String(n), { expirationTtl: 900 });
@@ -165,6 +174,7 @@ async function auth(req, env, role) {
     if (!dev || !dev.activatedAt || dev.blocked || dev.labId !== p.id || !user) return null;
     return { ...p, adm: user.role === 'admin', dev };
   }
+  if (p.role !== 'patient') return null; // رابط الدخول (plink) مش جلسة، بيتبدل بجلسة من /api/patient/link-login بس
   return p;
 }
 
@@ -450,7 +460,7 @@ async function createPatient(req, env, me) {
     }
   }
   if (!code) return fail('تعذر إنشاء كود، حاول تاني', 500);
-  const password = randomDigits(6);
+  const password = randomPassword();
   const salt = newSalt();
   const created = Date.now();
   await env.DATA.put('patient:' + code, JSON.stringify({ code, labId: me.id, name, salt, hash: await hashPw(password, salt), created }));
@@ -468,9 +478,10 @@ async function listPatients(env, me) {
 async function resetPatientPw(env, me, code) {
   const p = await getOwnedPatient(env, me.id, code);
   if (!p) return fail('المريض غير موجود', 404);
-  const password = randomDigits(6);
+  const password = randomPassword();
   p.salt = newSalt();
   p.hash = await hashPw(password, p.salt);
+  p.lv = (p.lv || 0) + 1; // كلمة سر جديدة = بتلغي كل روابط الدخول والجلسات القديمة
   await env.DATA.put('patient:' + code, JSON.stringify(p));
   await clearFail(env, 'patient:' + code);
   return json({ code, password, name: p.name });
@@ -528,21 +539,58 @@ async function deleteResult(env, me, code, id) {
 async function patientLogin(req, env) {
   const b = await readJson(req);
   const code = clean(b.code, 6).replace(/\D/g, '');
-  const lockKey = 'patient:' + code;
-  if (await isLocked(env, lockKey)) return fail('محاولات كتير غلط، استنى 15 دقيقة', 429);
+  const ip = clientIp(req);
+  const ipKey = 'pip:' + ip;
+  const lockKey = `patient:${code}:${ip}`; // القفل لكل (كود + IP) فحد غريب مايقدرش يقفل حساب المريض الحقيقي
+  if ((await isLocked(env, lockKey)) || (await isLocked(env, ipKey, MAX_IP_FAILS))) return fail('محاولات كتير غلط، استنى 15 دقيقة', 429);
+  const pw = normPw(b.password);
   const p = code ? await env.DATA.get('patient:' + code, 'json') : null;
-  const ok = p && safeEq(await hashPw(String(b.password || ''), p.salt), p.hash);
+  const ok = p && pw && safeEq(await hashPw(pw, p.salt), p.hash);
   if (!ok) {
     if (code) await addFail(env, lockKey);
+    await addFail(env, ipKey);
     return fail('الكود أو كلمة السر غلط', 401);
   }
   await clearFail(env, lockKey);
-  const token = await signToken(env, { role: 'patient', id: code, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
+  const token = await signToken(env, { role: 'patient', id: code, v: p.lv || 0, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
   return json({ token, name: p.name, code });
+}
+
+/* ---------- رابط الدخول المباشر للمريض (من غير كود ولا كلمة سر) ---------- */
+// الرابط توقيع HMAC مش مخزّن في أي مكان، وبيتلغي بزيادة lv (كلمة سر جديدة أو إلغاء الروابط)
+async function createLink(env, me, code) {
+  const p = await getOwnedPatient(env, me.id, code);
+  if (!p) return fail('المريض غير موجود', 404);
+  const exp = Math.floor(Date.now() / 1000) + LINK_TTL;
+  return json({ token: await signToken(env, { role: 'plink', id: code, v: p.lv || 0, exp }), exp });
+}
+async function revokeLinks(env, me, code) {
+  const p = await getOwnedPatient(env, me.id, code);
+  if (!p) return fail('المريض غير موجود', 404);
+  p.lv = (p.lv || 0) + 1;
+  await env.DATA.put('patient:' + code, JSON.stringify(p));
+  return json({ ok: true });
+}
+async function linkLogin(req, env) {
+  const b = await readJson(req);
+  const ipKey = 'pip:' + clientIp(req);
+  if (await isLocked(env, ipKey, MAX_IP_FAILS)) return fail('محاولات كتير غلط، استنى 15 دقيقة', 429);
+  const t = typeof b.token === 'string' && b.token.length < 600 ? await verifyToken(env, b.token) : null;
+  const pt = t && t.role === 'plink' ? await env.DATA.get('patient:' + t.id, 'json') : null;
+  if (!pt || (pt.lv || 0) !== (t.v || 0)) {
+    await addFail(env, ipKey);
+    return fail('الرابط ده انتهت صلاحيته أو اتلغى، اطلب رابط جديد من المعمل', 401);
+  }
+  const token = await signToken(env, { role: 'patient', id: pt.code, v: pt.lv || 0, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
+  return json({ token, name: pt.name, code: pt.code });
 }
 
 async function serveFile(env, p, code, id) {
   if (p.role === 'patient' ? p.id !== code : !(await getOwnedPatient(env, p.id, code))) return fail('غير مسموح', 403);
+  if (p.role === 'patient') {
+    const pt = await env.DATA.get('patient:' + code, 'json');
+    if (!pt || (pt.lv || 0) !== (p.v || 0)) return fail('سجّل الدخول', 401);
+  }
   const buf = await env.DATA.get(`file:${code}:${id}`, 'arrayBuffer');
   if (!buf) return fail('الملف غير موجود', 404);
   return new Response(buf, {
@@ -564,12 +612,13 @@ export default {
       if (pathname === '/api/device/activate' && m === 'POST') return await deviceActivate(req, env);
       if (pathname === '/api/lab/login' && m === 'POST') return await labLogin(req, env);
       if (pathname === '/api/patient/login' && m === 'POST') return await patientLogin(req, env);
+      if (pathname === '/api/patient/link-login' && m === 'POST') return await linkLogin(req, env);
 
       if (pathname === '/api/patient/results' && m === 'GET') {
         const p = await auth(req, env, 'patient');
         if (!p) return fail('سجّل الدخول', 401);
         const pt = await env.DATA.get('patient:' + p.id, 'json');
-        if (!pt) return fail('الحساب غير موجود', 401);
+        if (!pt || (pt.lv || 0) !== (p.v || 0)) return fail('الحساب غير موجود', 401);
         const brand = await getBrand(env, pt.labId);
         return json({ name: pt.name, code: p.id, lab: { name: brand.labName || '', logo: brand.logo || '' }, results: await listResults(env, p.id) });
       }
@@ -599,6 +648,10 @@ export default {
         if (pathname === '/api/lab/patients' && m === 'POST') return await createPatient(req, env, me);
         if ((r = pathname.match(/^\/api\/lab\/patients\/(\d{4,6})$/)) && m === 'DELETE') return await deletePatient(env, me, r[1]);
         if ((r = pathname.match(/^\/api\/lab\/patients\/(\d{4,6})\/reset$/)) && m === 'POST') return await resetPatientPw(env, me, r[1]);
+        if ((r = pathname.match(/^\/api\/lab\/patients\/(\d{4,6})\/link$/))) {
+          if (m === 'POST') return await createLink(env, me, r[1]);
+          if (m === 'DELETE') return await revokeLinks(env, me, r[1]);
+        }
         if ((r = pathname.match(/^\/api\/lab\/patients\/(\d{4,6})\/results$/))) {
           if (m === 'GET') {
             if (!(await getOwnedPatient(env, me.id, r[1]))) return fail('المريض غير موجود', 404);

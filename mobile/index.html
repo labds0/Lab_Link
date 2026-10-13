@@ -62,6 +62,11 @@ button{font-family:inherit;font-size:16px;font-weight:700;border-radius:14px;bor
 .primary{background:linear-gradient(135deg,var(--g1),var(--g2));color:var(--on);border:0;width:100%;padding:15px;font-size:17px;box-shadow:0 8px 20px color-mix(in srgb,var(--g2) 32%,transparent)}
 .primary:active{transform:translateY(1px)}
 .msg{color:var(--red);min-height:20px;margin:14px 0 0;font-size:14px}
+.pwwrap{position:relative;display:block}
+.pwwrap input{padding-inline-end:56px;text-transform:uppercase}
+.pwwrap .pwtoggle{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);margin-top:3px;width:38px;height:38px;box-shadow:none;border:0;background:transparent}
+.pwwrap .pwtoggle svg{width:20px;height:20px}
+.linkbusy{text-align:center;color:var(--mut);padding:30px 0}
 
 .bar{display:flex;align-items:center;gap:12px;margin:48px 0 18px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh)}
 .bar .lg{width:50px;height:50px;border-radius:15px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;flex:none}
@@ -105,7 +110,10 @@ button{font-family:inherit;font-size:16px;font-weight:700;border-radius:14px;bor
     <p class="sub">سجّل الدخول بالكود وكلمة السر اللي اتسلموا لك من المعمل</p>
     <form id="loginForm">
       <label>كود المريض<input name="code" inputmode="numeric" maxlength="6" autocomplete="username" required></label>
-      <label>كلمة السر<input name="password" inputmode="numeric" type="password" autocomplete="current-password" required></label>
+      <label>كلمة السر
+        <span class="pwwrap"><input name="password" id="pwInput" type="password" autocomplete="current-password" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="24" required>
+        <button type="button" class="icon-btn pwtoggle" id="pwToggle" aria-label="إظهار كلمة السر" title="إظهار كلمة السر"></button></span>
+      </label>
       <button class="primary" type="submit">دخول</button>
     </form>
     <p class="msg" id="msg"></p>
@@ -136,6 +144,8 @@ let token = get('p_token');
 const I = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff: '<path d="M17.9 17.9A10.1 10.1 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 4.1-5.1M9.9 4.2A9.8 9.8 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.2 3.2M1 1l22 22M14.1 14.1a3 3 0 1 1-4.2-4.2"/>',
   refresh: '<path d="M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
@@ -237,9 +247,35 @@ $('#logout').onclick = logout;
 $('#refresh').onclick = load;
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-// دخول تلقائي من الرابط: ...#c=123456&p=654321
+// إظهار/إخفاء كلمة السر
+(function () {
+  const inp = $('#pwInput'), btn = $('#pwToggle');
+  const sync = () => { const shown = inp.type === 'text'; btn.innerHTML = ic(shown ? 'eyeoff' : 'eye'); btn.setAttribute('aria-label', shown ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'); };
+  btn.onclick = () => { inp.type = inp.type === 'text' ? 'password' : 'text'; sync(); inp.focus(); };
+  sync();
+})();
+
+// دخول مباشر بالرابط اللي المعمل بعته: ...#t=<توكن موقّع> (من غير كود ولا كلمة سر)
+async function linkLogin(t) {
+  del('p_token'); token = null;
+  $('#login').classList.add('hidden'); $('#home').classList.remove('hidden');
+  $('#list').innerHTML = '<div class="skel"></div><div class="skel"></div>';
+  try {
+    const d = await (await api('/api/patient/link-login', { method: 'POST', body: { token: t } })).json();
+    token = d.token; set('p_token', token);
+    await load();
+  } catch (e) {
+    $('#home').classList.add('hidden'); $('#login').classList.remove('hidden');
+    $('#msg').textContent = e.message;
+  }
+}
+
+// دخول تلقائي من الرابط: ...#t=<توكن> (الجديد) أو ...#c=123456&p=ABCD2345 (القديم)
 const h = new URLSearchParams(location.hash.slice(1));
-if (h.get('c') && h.get('p')) {
+if (h.get('t')) {
+  history.replaceState(null, '', location.pathname + location.search); // نشيل التوكن من شريط العنوان
+  linkLogin(h.get('t'));
+} else if (h.get('c') && h.get('p')) {
   history.replaceState(null, '', location.pathname + location.search);
   del('p_token'); token = null;
   $('#login').classList.remove('hidden');
