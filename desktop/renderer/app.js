@@ -383,9 +383,27 @@ async function openSettings() {
 }
 
 /* ---------- patients ---------- */
+// قايمة Cloudflare KV بتتأخر شوية (لحد دقيقة أو أكتر) في إظهار الحذف، فبنفتكر المحذوفين محليًا ونخفيهم
+const GONE_TTL = 15 * 60 * 1000;
+function goneMap() {
+  let m = {};
+  try { m = JSON.parse(localStorage.getItem('gonePatients') || '{}'); } catch {}
+  const now = Date.now();
+  for (const k of Object.keys(m)) if (now - m[k] > GONE_TTL) delete m[k];
+  return m;
+}
+function markGone(code) {
+  const m = goneMap(); m[code] = Date.now();
+  try { localStorage.setItem('gonePatients', JSON.stringify(m)); } catch {}
+}
+async function fetchPatients() {
+  const list = (await (await api('/api/lab/patients')).json()).patients;
+  const gone = goneMap();
+  return list.filter((p) => !gone[p.code]);
+}
 async function loadPatients() {
   try {
-    patients = (await (await api('/api/lab/patients')).json()).patients;
+    patients = await fetchPatients();
     renderPatients();
   } catch (err) { toast(err.message); }
 }
@@ -613,7 +631,10 @@ async function selectPatient(p) {
     const { results } = await (await api(`/api/lab/patients/${p.code}/results`)).json();
     if (selected?.code !== p.code) return;
     renderResults(results);
-  } catch (err) { $('#results').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+  } catch (err) {
+    if (/غير موجود/.test(err.message)) { markGone(p.code); if (selected?.code === p.code) selected = null; loadPatients(); }
+    if (!selected) showEmpty(); else $('#results').innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+  }
 }
 
 function renderResults(results) {
@@ -651,6 +672,7 @@ function renderResults(results) {
     if (!confirm(`حذف ${p.name} وكل نتايجه نهائيًا؟`)) return;
     try {
       await api(`/api/lab/patients/${p.code}`, { method: 'DELETE' });
+      markGone(p.code);
       selected = null;
       showEmpty();
       loadPatients();
@@ -765,7 +787,7 @@ function addPending(f) {
   autoProcess();
 }
 async function refreshPatientsQuiet() {
-  try { patients = (await (await api('/api/lab/patients')).json()).patients; renderPatients(); return true; }
+  try { patients = await fetchPatients(); renderPatients(); return true; }
   catch (e) { return false; }
 }
 // قراءة الملف من الفولدر ورفعه لمريض، وبعدها نقله لـ _uploaded
