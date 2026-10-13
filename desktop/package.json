@@ -9,7 +9,8 @@
     "dist": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.3.0",
+    "pdfjs-dist": "4.10.38"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -18,7 +19,7 @@
   "build": {
     "appId": "com.labresults.desktop",
     "productName": "Lab Link",
-    "files": ["main.js", "serial.js", "folderwatch.js", "preload.js", "app-config.json", "renderer/**/*"],
+    "files": ["main.js", "serial.js", "folderwatch.js", "pdftext.js", "preload.js", "app-config.json", "renderer/**/*"],
     "publish": [{ "provider": "github", "owner": "labds0", "repo": "Lab_Link" }],
     "win": { "target": "nsis", "icon": "renderer/icon.png" },
     "nsis": {

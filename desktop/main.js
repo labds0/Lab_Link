@@ -8,6 +8,7 @@ const config = require('./app-config.json');
 
 const { parseHardware, serialFromParts, resolveSerial, readWindowsHardware } = require('./serial');
 const { createWatcher } = require('./folderwatch');
+const { firstPageTexts } = require('./pdftext');
 
 // سيريال الجهاز مربوط بالهاردوير (اللوحة الأم + هارد النظام)، مش بالويندوز ولا الإنترنت.
 let SERIAL = '';
@@ -94,6 +95,7 @@ ipcMain.handle('folder:set', (_e, o) => {
   return autoState();
 });
 ipcMain.handle('folder:read', (_e, id) => watcher.read(String(id)));
+ipcMain.handle('folder:text', async (_e, id) => firstPageTexts(await watcher.read(String(id))));
 ipcMain.handle('folder:done', async (_e, id) => { await watcher.done(String(id)); return true; });
 ipcMain.handle('folder:skip', async (_e, id) => { await watcher.skip(String(id)); return true; });
 // روابط واتساب وSMS بس، مفيش أي رابط تاني بيتفتح من الواجهة

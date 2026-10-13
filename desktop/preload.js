@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('desktop', {
     choose: () => call('folder:choose'),
     set: (o) => call('folder:set', o),
     read: (id) => call('folder:read', id),
+    text: (id) => call('folder:text', id),
     done: (id) => call('folder:done', id),
     skip: (id) => call('folder:skip', id),
     onFound: on('folder:found'),

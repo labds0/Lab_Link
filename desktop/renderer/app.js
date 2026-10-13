@@ -308,7 +308,7 @@ async function openSettings() {
       <p class="hint">اختار فولدر على الجهاز ده، وأي ملف PDF بيتحط فيه بيترفع لوحده لمريضه. اسم الملف لازم يبدأ بكود المريض، مثال: <b dir="ltr">604913 - CBC.pdf</b>. الملفات اللي اترفعت بتتنقل لفولدر فرعي اسمه <b dir="ltr">_uploaded</b> جوه نفس الفولدر.</p>
       <div class="folder-row"><div class="folder-path" id="afPath" dir="auto">${esc(AUTO.cfg.dir || 'لسه ما اخترتش فولدر')}</div><button type="button" class="btn sm" id="afPick">${ic('folder')}اختيار فولدر</button></div>
       <label class="chk"><input type="checkbox" id="afOn" ${AUTO.cfg.enabled ? 'checked' : ''}>تشغيل الرفع التلقائي</label>
-      <label class="chk"><input type="checkbox" id="afName" ${AUTO.cfg.byName ? 'checked' : ''}>مطابقة الملفات اللي مفيهاش كود بالاسم (لمرضى آخر ${LU.NAME_WINDOW_DAYS} أيام بس)</label>
+      <label class="chk"><input type="checkbox" id="afName" ${AUTO.cfg.byName ? 'checked' : ''}>مطابقة الملفات اللي مفيهاش كود باسم المريض (من اسم الملف أو من جوه الـ PDF، لمرضى آخر ${LU.NAME_WINDOW_DAYS} أيام بس)</label>
       <p class="hint">المطابقة بالاسم أقل أمانًا من الكود. لو فيه مريضين بنفس الاسم البرنامج مش بيرفع ويسألك. الكود هو الأضمن.</p>
     </div>
 
@@ -778,7 +778,28 @@ async function uploadPending(it, patient) {
   try { await D.folder.done(it.id); } catch { /* اترفع فعلًا، النقل بس هو اللي فشل */ }
   AUTO.queue.delete(it.id); AUTO.held.delete(it.id);
   AUTO.uploaded++;
+  rememberVisit(it.name, patient.code);
   if (selected?.code === patient.code) selectPatient(selected);
+}
+// ذاكرة رقم الزيارة: لو ملف من زيارة اترفع لمريض، باقي ملفات نفس الزيارة تروح له
+const visitMap = () => { try { return JSON.parse(localStorage.getItem('visitmap') || '{}'); } catch { return {}; } };
+function rememberVisit(name, code) {
+  const k = LU.visitKey(name);
+  if (!k) return;
+  try { const m = visitMap(); m[k] = code; const ks = Object.keys(m); if (ks.length > 2000) delete m[ks[0]]; localStorage.setItem('visitmap', JSON.stringify(m)); } catch {}
+}
+// الترتيب: كود في اسم الملف ← رقم زيارة اتعرف قبل كده ← (لو متفعّل) الاسم في اسم الملف ← الاسم جوه الـ PDF
+async function findPatientFor(it) {
+  const byCode = LU.matchFile(it.name, patients, { byName: false });
+  if (byCode.patient || LU.extractCode(it.name)) return byCode;
+  const vk = LU.visitKey(it.name);
+  if (vk) { const p = patients.find((x) => x.code === visitMap()[vk]); if (p) return { patient: p, how: 'visit' }; }
+  if (!AUTO.cfg.byName) return byCode;
+  const byName = LU.matchFile(it.name, patients, { byName: true });
+  if (byName.patient) return byName;
+  let texts = [];
+  try { texts = await D.folder.text(it.id); } catch { /* نتعلّق ونسيبها ليدوي */ }
+  return LU.matchText(texts, patients);
 }
 async function autoProcess() {
   if (AUTO.busy || !token || !lab || !AUTO.queue.size) return;
@@ -787,7 +808,7 @@ async function autoProcess() {
     if (!(await refreshPatientsQuiet())) return; // مفيش اتصال: هنحاول تاني بعد دقيقة
     for (const it of [...AUTO.queue.values()]) {
       if (!token) break;
-      const m = LU.matchFile(it.name, patients, { byName: AUTO.cfg.byName });
+      const m = await findPatientFor(it);
       if (!m.patient) { hold(it, m.reason); continue; }
       try {
         await uploadPending(it, m.patient);

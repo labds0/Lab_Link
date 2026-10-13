@@ -82,5 +82,44 @@
     return { patient: best[0].p, how: 'name' };
   }
 
-  return { normalizePhone, fmtPw, shareMessage, waUrl, smsUrl, normName, extractCode, matchFile, NAME_WINDOW_DAYS };
+
+  /* ---------- مطابقة بالاسم اللي جوه الـ PDF ---------- */
+  // رقم الزيارة في أول اسم الملف (1026090710031_Blood_Picture.pdf): نفس الرقم = نفس المريض
+  function visitKey(file) {
+    const m = toAscii(baseName(file)).match(/^\s*(\d{8,})(?=[_\-\s.]|$)/);
+    return m ? m[1] : '';
+  }
+  const TITLE = /^\s*(?:الأستاذ|الاستاذ|السيد|السيدة|الطفل|الطفلة|الآنسة|الانسة|الدكتور|الدكتورة|Mr|Mrs|Ms|Miss)[ةه]?\.?\s*[\/:]\s*(.+)$/i;
+  function nameFromTexts(strs) {
+    for (const raw of strs || []) {
+      const m = String(raw).normalize('NFKC').match(TITLE);
+      if (m) { const n = normName(m[1]); if (n.split(' ').length >= 2) return n; }
+    }
+    return '';
+  }
+  const hasWords = (hay, needle) => (' ' + hay + ' ').includes(' ' + needle + ' ');
+  // يرجّع { patient, how:'text', found } أو { reason, found }
+  function matchText(strs, patients, opts = {}) {
+    const { now = Date.now() } = opts;
+    const found = nameFromTexts(strs);
+    const since = now - NAME_WINDOW_DAYS * 86400000;
+    const pool = patients
+      .filter((p) => !p.created || p.created >= since)
+      .map((p) => ({ p, n: normName(p.name) }))
+      .filter((x) => x.n.split(' ').length >= 2);
+    let hits;
+    if (found) {
+      hits = pool.filter((x) => x.n === found || hasWords(found, x.n) || hasWords(x.n, found));
+    } else {
+      const all = normName((strs || []).map((x) => String(x).normalize('NFKC')).join(' '));
+      hits = pool.filter((x) => hasWords(all, x.n));
+    }
+    if (!hits.length) return { reason: found ? `الاسم "${found}" في الملف مش مسجّل عندك في آخر ${NAME_WINDOW_DAYS} أيام` : 'مفيش اسم مريض واضح جوه الملف', found };
+    const exact = hits.filter((x) => x.n === found);
+    const best = exact.length ? exact : (() => { const mx = Math.max(...hits.map((x) => x.n.split(' ').length)); return hits.filter((x) => x.n.split(' ').length === mx); })();
+    if (best.length > 1) return { reason: `أكتر من مريض بنفس الاسم "${found}"، اختار بنفسك`, found };
+    return { patient: best[0].p, how: 'text', found };
+  }
+
+  return { visitKey, nameFromTexts, matchText, normalizePhone, fmtPw, shareMessage, waUrl, smsUrl, normName, extractCode, matchFile, NAME_WINDOW_DAYS };
 });
