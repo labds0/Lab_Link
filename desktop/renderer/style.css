@@ -1,3 +1,4 @@
+@font-face{font-family:"Cairo";src:url("fonts/Cairo.ttf") format("truetype");font-weight:200 1000;font-style:normal;font-display:swap}
 /* ============ Design tokens ============ */
 :root {
   color-scheme: light;
@@ -34,7 +35,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, "Noto Naskh Arabic", system-ui, sans-serif;
+  font-family: "Cairo","Segoe UI",Tahoma,system-ui,sans-serif;
   background: var(--bg); color: var(--txt); font-size: 15px; line-height: 1.5;
   -webkit-font-smoothing: antialiased; transition: background .25s, color .25s;
 }
